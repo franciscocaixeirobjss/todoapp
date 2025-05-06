@@ -5,15 +5,15 @@ import (
 	"io"
 	"log/slog"
 	"os"
-	"todoapp/api"
+	"todoapp/task"
 )
 
 // LoadData initializes the list of tasks and maxTaskID from a JSON file
-func LoadData(filePath string, tasks *[]api.Task, maxTaskID *int) error {
+func LoadData(filePath string, tasks *[]task.Task, maxTaskID *int) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			*tasks = []api.Task{}
+			*tasks = []task.Task{}
 			*maxTaskID = 0
 			slog.Info("No existing data file found. Starting with an empty task list.")
 			return nil
@@ -46,7 +46,7 @@ func LoadData(filePath string, tasks *[]api.Task, maxTaskID *int) error {
 }
 
 // SaveData saves the tasks to a JSON file
-func SaveData(filename string, tasks []api.Task) error {
+func SaveData(filename string, tasks []task.Task) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err

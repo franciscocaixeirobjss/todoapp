@@ -1,16 +1,15 @@
 package main
 
 import (
-	"context"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 	"todoapp/api"
 	"todoapp/files"
 	"todoapp/logging"
+	"todoapp/task"
 )
 
 func main() {
@@ -18,33 +17,27 @@ func main() {
 		Level: slog.LevelInfo,
 	}
 
-	handler := slog.NewTextHandler(os.Stdout, opts)
-	logger := slog.New(handler)
+	slogHandler := slog.NewTextHandler(os.Stdout, opts)
+	logger := slog.New(slogHandler)
 	slog.SetDefault(logger)
 
-	var listOfTasks []api.Task
-	var maxTaskID int
-
-	err := files.LoadData("todo.json", &listOfTasks, &maxTaskID)
+	taskManager := &task.TaskManager{}
+	err := files.LoadData("todo.json", &taskManager.Tasks, &taskManager.MaxTaskID)
 	if err != nil {
 		slog.Error("Failed to load data", "error", err)
 		return
 	}
 
-	// Initialize handlers with shared state
 	handlers := &api.Handlers{
-		Tasks:     &listOfTasks,
-		MaxTaskID: &maxTaskID,
+		TaskManager: taskManager,
 	}
 
 	mux := http.NewServeMux()
-
 	mux.HandleFunc("/create", handlers.CreateHandler)
 	mux.HandleFunc("/get", handlers.GetHandler)
 	mux.HandleFunc("/update", handlers.UpdateHandler)
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
 
-	// Wrap the mux with the TraceIDMiddleware
 	wrappedMux := logging.TraceIDMiddleware(mux)
 
 	server := &http.Server{
@@ -65,13 +58,11 @@ func main() {
 	<-stop
 	slog.Info("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Close(); err != nil {
 		slog.Error("Server forced to shut down", "error", err)
 	}
 
-	if err := files.SaveData("todo.json", listOfTasks); err != nil {
+	if err := files.SaveData("todo.json", taskManager.Tasks); err != nil {
 		slog.Error("Failed to save tasks to file", "error", err)
 	} else {
 		slog.Info("Tasks saved successfully")
