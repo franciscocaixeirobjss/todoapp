@@ -29,8 +29,10 @@ func main() {
 		return
 	}
 
+	taskActor := task.NewTaskActor(taskManager, 10)
+
 	handlers := &api.Handlers{
-		TaskManager: taskManager,
+		TaskActor: taskActor,
 	}
 
 	mux := http.NewServeMux()

@@ -2,19 +2,17 @@ package api
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"todoapp/task"
 )
 
 type Handlers struct {
-	TaskManager *task.TaskManager
+	TaskActor *task.TaskActor
 }
 
 func (h *Handlers) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		slog.Error("Invalid HTTP method", "method", r.Method)
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
 	}
@@ -22,39 +20,53 @@ func (h *Handlers) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	var taskToBeCreated task.Task
 	err := json.NewDecoder(r.Body).Decode(&taskToBeCreated)
 	if err != nil {
-		slog.Error("Failed to decode request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	err = h.TaskManager.AddTask(taskToBeCreated)
-	if err != nil {
-		slog.Error("Failed to create task", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	response := make(chan interface{}, 1)
+	request := task.TaskRequest{
+		Action:   task.CreateRequest,
+		Task:     taskToBeCreated,
+		Response: response,
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	slog.Info("Task created successfully")
+	select {
+	case h.TaskActor.RequestsChan <- request:
+		if err := <-response; err != nil {
+			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	default:
+		http.Error(w, "Service unavailable. Please try again later.", http.StatusServiceUnavailable)
+	}
 }
 
 func (h *Handlers) GetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		slog.Error("Invalid HTTP method", "method", r.Method)
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	currentTasks := h.TaskManager.GetTasks()
+	response := make(chan interface{}, 1)
+	request := task.TaskRequest{
+		Action:   task.GetRequest,
+		Response: response,
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(currentTasks)
+	select {
+	case h.TaskActor.RequestsChan <- request:
+		tasks := <-response
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(tasks)
+	default:
+		http.Error(w, "Service unavailable. Please try again later.", http.StatusServiceUnavailable)
+	}
 }
 
 func (h *Handlers) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		slog.Error("Invalid HTTP method", "method", r.Method)
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
 	}
@@ -62,51 +74,65 @@ func (h *Handlers) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	var taskToBeUpdated task.Task
 	err := json.NewDecoder(r.Body).Decode(&taskToBeUpdated)
 	if err != nil {
-		slog.Error("Failed to decode request body", "error", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	err = h.TaskManager.UpdateTask(taskToBeUpdated)
-	if err != nil {
-		if err == task.ErrTaskNotFound {
-			slog.Error("Task not found", "taskID", taskToBeUpdated.ID)
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-
-		slog.Error("Failed to update task", "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	response := make(chan interface{}, 1)
+	request := task.TaskRequest{
+		Action:   task.UpdateRequest,
+		Task:     taskToBeUpdated,
+		Response: response,
 	}
 
-	w.WriteHeader(http.StatusOK)
-	slog.Info("Task updated successfully", "taskID", taskToBeUpdated.ID)
+	select {
+	case h.TaskActor.RequestsChan <- request:
+		if err := <-response; err != nil {
+			if err == task.ErrTaskNotFound {
+				http.Error(w, err.(error).Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	default:
+		http.Error(w, "Service unavailable. Please try again later.", http.StatusServiceUnavailable)
+	}
 }
 
 func (h *Handlers) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		slog.Error("Invalid HTTP method", "method", r.Method)
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract the task ID from the URL path
 	path := r.URL.Path
 	taskID, err := strconv.Atoi(path[len("/delete/"):])
 	if err != nil {
-		slog.Error("Invalid task ID", "error", err)
 		http.Error(w, "Invalid task ID", http.StatusBadRequest)
 		return
 	}
 
-	err = h.TaskManager.DeleteTask(taskID)
-	if err != nil {
-		slog.Error("Failed to delete task", "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+	response := make(chan interface{}, 1)
+	request := task.TaskRequest{
+		Action:   task.DeleteRequest,
+		TaskID:   taskID,
+		Response: response,
 	}
 
-	w.WriteHeader(http.StatusOK)
-	slog.Info("Task deleted successfully", "taskID", taskID)
+	select {
+	case h.TaskActor.RequestsChan <- request:
+		if err := <-response; err != nil {
+			if err == task.ErrTaskNotFound {
+				http.Error(w, err.(error).Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	default:
+		http.Error(w, "Service unavailable. Please try again later.", http.StatusServiceUnavailable)
+	}
 }

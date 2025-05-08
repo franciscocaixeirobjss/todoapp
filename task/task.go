@@ -16,6 +16,13 @@ const (
 	Completed
 )
 
+const (
+	GetRequest    = "get"
+	CreateRequest = "create"
+	UpdateRequest = "update"
+	DeleteRequest = "delete"
+)
+
 // Task represents a to-do task
 type Task struct {
 	ID           int        `json:"id"`
@@ -36,6 +43,18 @@ type TaskManager struct {
 	MaxTaskID int
 }
 
+type TaskRequest struct {
+	Action   string
+	Task     Task
+	TaskID   int
+	Response chan<- interface{}
+}
+
+type TaskActor struct {
+	TaskManager  *TaskManager
+	RequestsChan chan TaskRequest
+}
+
 var (
 	// ErrTaskNotFound is returned when a task is not found
 	ErrTaskNotFound = errors.New("task not found")
@@ -43,8 +62,39 @@ var (
 	ErrInvalidStatus = errors.New("invalid status string")
 )
 
-// AddTask adds a new task to the list of tasks
-func (tm *TaskManager) AddTask(task Task) error {
+func NewTaskActor(taskManager *TaskManager, requestChanSize int) *TaskActor {
+	actor := &TaskActor{
+		TaskManager:  taskManager,
+		RequestsChan: make(chan TaskRequest, requestChanSize),
+	}
+	go actor.processLoop()
+	return actor
+}
+
+func (ta *TaskActor) processLoop() {
+	for req := range ta.RequestsChan {
+		switch req.Action {
+		case CreateRequest:
+			err := ta.TaskManager.CreateTask(req.Task)
+			req.Response <- err
+		case GetRequest:
+			tasks := ta.TaskManager.GetTasks()
+			req.Response <- tasks
+		case UpdateRequest:
+			err := ta.TaskManager.UpdateTask(req.Task)
+			req.Response <- err
+		case DeleteRequest:
+			err := ta.TaskManager.DeleteTask(req.TaskID)
+			req.Response <- err
+		default:
+			req.Response <- errors.New("unknown action")
+		}
+		close(req.Response)
+	}
+}
+
+// CreateTask adds a new task to the list of tasks
+func (tm *TaskManager) CreateTask(task Task) error {
 	now := time.Now()
 
 	statusID, err := convertStringToStatusID(task.StatusString)
@@ -76,13 +126,11 @@ func (tm *TaskManager) GetTasks() []Task {
 func (tm *TaskManager) UpdateTask(updatedTask Task) error {
 	now := time.Now()
 
-	// Validate the task's status
 	statusID, err := convertStringToStatusID(updatedTask.StatusString)
 	if err != nil {
 		return ErrInvalidStatus
 	}
 
-	// Find and update the task
 	for i, task := range tm.Tasks {
 		if task.ID == updatedTask.ID && !task.Deleted {
 			updatedTask.StatusID = statusID

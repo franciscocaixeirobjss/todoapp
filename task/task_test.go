@@ -2,6 +2,8 @@ package task
 
 import (
 	"os"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 )
@@ -11,8 +13,111 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func TestTaskActor_ConcurrentSafety(t *testing.T) {
+	numGoroutines := 100
+
+	taskManager := &TaskManager{}
+	taskActor := NewTaskActor(taskManager, numGoroutines)
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(taskID int) {
+			defer wg.Done()
+
+			response := make(chan interface{})
+			taskActor.RequestsChan <- TaskRequest{
+				Action: CreateRequest,
+				Task: Task{
+					Title:        "Task " + strconv.Itoa(taskID),
+					Description:  "Description for Task " + strconv.Itoa(taskID),
+					StatusString: "NotStarted",
+				},
+				Response: response,
+			}
+
+			if err := <-response; err != nil {
+				t.Errorf("Failed to add task: %v", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	response := make(chan interface{})
+	taskActor.RequestsChan <- TaskRequest{
+		Action:   GetRequest,
+		Response: response,
+	}
+
+	tasks := <-response
+	if len(tasks.([]Task)) != numGoroutines {
+		t.Errorf("Expected %d tasks, but got %d", numGoroutines, len(tasks.([]Task)))
+	}
+}
+
+func TestTaskActor_ConcurrentUpdate(t *testing.T) {
+	numGoroutines := 50
+
+	taskManager := &TaskManager{}
+	taskActor := NewTaskActor(taskManager, numGoroutines)
+
+	// Add a single task
+	response := make(chan interface{})
+	taskActor.RequestsChan <- TaskRequest{
+		Action: CreateRequest,
+		Task: Task{
+			Title:        "Initial Task",
+			Description:  "Initial Description",
+			StatusString: "NotStarted",
+		},
+		Response: response,
+	}
+	<-response
+
+	// Concurrently update the task
+	var wg sync.WaitGroup
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(updateID int) {
+			defer wg.Done()
+
+			response := make(chan interface{})
+			taskActor.RequestsChan <- TaskRequest{
+				Action: UpdateRequest,
+				Task: Task{
+					ID:           1,
+					Title:        "Updated Task " + strconv.Itoa(updateID),
+					Description:  "Updated Description " + strconv.Itoa(updateID),
+					StatusString: "Started",
+				},
+				Response: response,
+			}
+
+			if err := <-response; err != nil {
+				t.Errorf("Failed to update task: %v", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// Verify the final state of the task
+	response = make(chan interface{})
+	taskActor.RequestsChan <- TaskRequest{
+		Action:   GetRequest,
+		Response: response,
+	}
+
+	tasks := <-response
+	if len(tasks.([]Task)) != 1 {
+		t.Errorf("Expected 1 task, but got %d", len(tasks.([]Task)))
+	}
+}
+
 // Test adding a task with an empty title or invalid status.
-func TestAddTask(t *testing.T) {
+func TestCreateTask(t *testing.T) {
 	tm := &TaskManager{
 		Tasks:     []Task{},
 		MaxTaskID: 0,
@@ -24,7 +129,7 @@ func TestAddTask(t *testing.T) {
 		StatusString: "Not Started",
 	}
 
-	err := tm.AddTask(task)
+	err := tm.CreateTask(task)
 	if err != nil {
 		t.Fatalf("AddTask failed: %v", err)
 	}
