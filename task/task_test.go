@@ -130,9 +130,9 @@ func TestConvertStringToStatusID(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.input, func(t *testing.T) {
-			result, _ := ConvertStringToStatusID(test.input)
+			result, _ := convertStringToStatusID(test.input)
 			if result != test.expected {
-				t.Errorf("ConvertStringToStatusID(%q) = %d; want %d", test.input, result, test.expected)
+				t.Errorf("convertStringToStatusID(%q) = %d; want %d", test.input, result, test.expected)
 			}
 		})
 	}

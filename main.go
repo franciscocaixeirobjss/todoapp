@@ -10,6 +10,7 @@ import (
 	"todoapp/files"
 	"todoapp/logging"
 	"todoapp/task"
+	"todoapp/webserver"
 )
 
 func main() {
@@ -37,6 +38,9 @@ func main() {
 	mux.HandleFunc("/get", handlers.GetHandler)
 	mux.HandleFunc("/update", handlers.UpdateHandler)
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
+
+	webserver.ServeStaticPage(mux)
+	webserver.ServeDynamicPage(mux, taskManager)
 
 	wrappedMux := logging.TraceIDMiddleware(mux)
 

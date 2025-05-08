@@ -37,7 +37,9 @@ type TaskManager struct {
 }
 
 var (
-	ErrTaskNotFound  = errors.New("task not found")
+	// ErrTaskNotFound is returned when a task is not found
+	ErrTaskNotFound = errors.New("task not found")
+	// ErrTaskAlreadyExists is returned when a task already exists
 	ErrInvalidStatus = errors.New("invalid status string")
 )
 
@@ -45,19 +47,16 @@ var (
 func (tm *TaskManager) AddTask(task Task) error {
 	now := time.Now()
 
-	// Validate the task's status
-	statusID, err := ConvertStringToStatusID(task.StatusString)
+	statusID, err := convertStringToStatusID(task.StatusString)
 	if err != nil {
 		return ErrInvalidStatus
 	}
 
-	// Assign a new ID and timestamps
 	task.ID = tm.MaxTaskID + 1
 	tm.MaxTaskID++
 	task.CreatedAt = &now
 	task.StatusID = statusID
 
-	// Append the task to the list
 	tm.Tasks = append(tm.Tasks, task)
 	return nil
 }
@@ -78,7 +77,7 @@ func (tm *TaskManager) UpdateTask(updatedTask Task) error {
 	now := time.Now()
 
 	// Validate the task's status
-	statusID, err := ConvertStringToStatusID(updatedTask.StatusString)
+	statusID, err := convertStringToStatusID(updatedTask.StatusString)
 	if err != nil {
 		return ErrInvalidStatus
 	}
@@ -101,7 +100,6 @@ func (tm *TaskManager) UpdateTask(updatedTask Task) error {
 func (tm *TaskManager) DeleteTask(taskID int) error {
 	now := time.Now()
 
-	// Find and mark the task as deleted
 	for i, task := range tm.Tasks {
 		if task.ID == taskID && !task.Deleted {
 			tm.Tasks[i].Deleted = true
@@ -113,8 +111,7 @@ func (tm *TaskManager) DeleteTask(taskID int) error {
 	return ErrTaskNotFound
 }
 
-// ConvertStringToStatusID converts a status string to a Status ID
-func ConvertStringToStatusID(status string) (Status, error) {
+func convertStringToStatusID(status string) (Status, error) {
 	switch strings.ReplaceAll(status, " ", "") {
 	case "NotStarted":
 		return NotStarted, nil
