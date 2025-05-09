@@ -13,7 +13,7 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestTaskActor_ConcurrentSafety(t *testing.T) {
+func TestTaskActor_Concurrency(t *testing.T) {
 	numGoroutines := 100
 
 	taskManager := &TaskManager{}

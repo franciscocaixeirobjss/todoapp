@@ -94,5 +94,53 @@
     "due_date": null,
     "deleted_at": "2025-05-08T09:01:43.8042157+01:00",
     "deleted": true
+  },
+  {
+    "id": 9,
+    "title": "Golang",
+    "description": "Task 664e77ec-9490-41fd-a958-7e0526e01962",
+    "status_id": 1,
+    "status": "Not Started",
+    "created_at": "2025-05-09T10:39:15.4089099+01:00",
+    "updated_at": null,
+    "due_date": null,
+    "deleted_at": null,
+    "deleted": false
+  },
+  {
+    "id": 10,
+    "title": "Golang",
+    "description": "Task 10 updated",
+    "status_id": 3,
+    "status": "Completed",
+    "created_at": "2025-05-09T10:39:17.2372006+01:00",
+    "updated_at": "2025-05-09T10:43:16.2035933+01:00",
+    "due_date": "2025-05-15T00:00:00+01:00",
+    "deleted_at": null,
+    "deleted": false
+  },
+  {
+    "id": 11,
+    "title": "Golang",
+    "description": "Task d3cb6b6a-8acf-4811-9d1e-dd707fd4ff8d",
+    "status_id": 1,
+    "status": "Not Started",
+    "created_at": "2025-05-09T10:39:17.9557169+01:00",
+    "updated_at": null,
+    "due_date": null,
+    "deleted_at": null,
+    "deleted": false
+  },
+  {
+    "id": 12,
+    "title": "Golang",
+    "description": "Task e1e88225-9012-4dd1-b00b-daa3c5027260",
+    "status_id": 1,
+    "status": "Not Started",
+    "created_at": "2025-05-09T10:43:07.1061898+01:00",
+    "updated_at": null,
+    "due_date": null,
+    "deleted_at": null,
+    "deleted": false
   }
 ]

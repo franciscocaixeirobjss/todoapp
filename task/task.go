@@ -38,11 +38,13 @@ type Task struct {
 }
 
 // TaskManager struct to manage tasks and their state
+// FIXME: Rename to avoid starting with the package name
 type TaskManager struct {
 	Tasks     []Task
 	MaxTaskID int
 }
 
+// FIXME: Rename to avoid starting with the package name
 type TaskRequest struct {
 	Action   string
 	Task     Task
@@ -50,6 +52,7 @@ type TaskRequest struct {
 	Response chan<- interface{}
 }
 
+// FIXME: Rename to avoid starting with the package name
 type TaskActor struct {
 	TaskManager  *TaskManager
 	RequestsChan chan TaskRequest
@@ -58,7 +61,7 @@ type TaskActor struct {
 var (
 	// ErrTaskNotFound is returned when a task is not found
 	ErrTaskNotFound = errors.New("task not found")
-	// ErrTaskAlreadyExists is returned when a task already exists
+	// ErrInvalidStatus is returned when a task already exists
 	ErrInvalidStatus = errors.New("invalid status string")
 )
 

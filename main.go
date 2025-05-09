@@ -1,19 +1,27 @@
 package main
 
 import (
+	"errors"
+	"flag"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"todoapp/api"
 	"todoapp/files"
-	"todoapp/logging"
+	"todoapp/handlers"
+	"todoapp/middleware"
 	"todoapp/task"
 	"todoapp/webserver"
 )
 
 func main() {
+	requestChanSize := flag.Int("requestChanSize", 10, "Size of the request channel for TaskActor")
+	flag.Parse()
+
+	// TODO: add flag to set the logging level
+	// TODO: add flag to set the json file name
+
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelInfo,
 	}
@@ -29,9 +37,16 @@ func main() {
 		return
 	}
 
-	taskActor := task.NewTaskActor(taskManager, 10)
+	defer func() {
+		if err := files.SaveData("todo.json", taskManager.Tasks); err != nil {
+			slog.Error("Failed to save tasks to file", "error", err)
+		} else {
+			slog.Info("Tasks saved successfully")
+		}
+	}()
 
-	handlers := &api.Handlers{
+	taskActor := task.NewTaskActor(taskManager, *requestChanSize)
+	handlers := &handlers.Handlers{
 		TaskActor: taskActor,
 	}
 
@@ -41,10 +56,11 @@ func main() {
 	mux.HandleFunc("/update", handlers.UpdateHandler)
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
 
+	// FIXME: Should this be moved somewhere else?
 	webserver.ServeStaticPage(mux)
 	webserver.ServeDynamicPage(mux, taskManager)
 
-	wrappedMux := logging.TraceIDMiddleware(mux)
+	wrappedMux := middleware.TraceIDMiddleware(mux)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -56,21 +72,16 @@ func main() {
 
 	go func() {
 		slog.Info("Server starting on :8080")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("Server failed to start", "error", err)
 		}
 	}()
 
 	<-stop
+
 	slog.Info("Shutting down server...")
 
 	if err := server.Close(); err != nil {
 		slog.Error("Server forced to shut down", "error", err)
-	}
-
-	if err := files.SaveData("todo.json", taskManager.Tasks); err != nil {
-		slog.Error("Failed to save tasks to file", "error", err)
-	} else {
-		slog.Info("Tasks saved successfully")
 	}
 }
