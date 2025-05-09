@@ -16,11 +16,8 @@ import (
 )
 
 func main() {
-	requestChanSize := flag.Int("requestChanSize", 10, "Size of the request channel for TaskActor")
+	requestChanSize := flag.Int("requestChanSize", 10, "Size of the request channel")
 	flag.Parse()
-
-	// TODO: add flag to set the logging level
-	// TODO: add flag to set the json file name
 
 	opts := &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -30,12 +27,14 @@ func main() {
 	logger := slog.New(slogHandler)
 	slog.SetDefault(logger)
 
-	taskManager := &task.TaskManager{}
+	taskManager := &task.Manager{}
 	err := files.LoadData("todo.json", &taskManager.Tasks, &taskManager.MaxTaskID)
 	if err != nil {
 		slog.Error("Failed to load data", "error", err)
 		return
 	}
+
+	task.InitTaskManager(taskManager, *requestChanSize)
 
 	defer func() {
 		if err := files.SaveData("todo.json", taskManager.Tasks); err != nil {
@@ -45,18 +44,12 @@ func main() {
 		}
 	}()
 
-	taskActor := task.NewTaskActor(taskManager, *requestChanSize)
-	handlers := &handlers.Handlers{
-		TaskActor: taskActor,
-	}
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/create", handlers.CreateHandler)
 	mux.HandleFunc("/get", handlers.GetHandler)
 	mux.HandleFunc("/update", handlers.UpdateHandler)
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
 
-	// FIXME: Should this be moved somewhere else?
 	webserver.ServeStaticPage(mux)
 	webserver.ServeDynamicPage(mux, taskManager)
 

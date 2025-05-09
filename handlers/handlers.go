@@ -2,16 +2,14 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"todoapp/task"
 )
 
-type Handlers struct {
-	TaskActor *task.TaskActor
-}
-
-func (h *Handlers) CreateHandler(w http.ResponseWriter, r *http.Request) {
+// CreateHandler handles task creation
+func CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
@@ -24,17 +22,17 @@ func (h *Handlers) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := make(chan interface{}, 1)
-	request := task.TaskRequest{
+	response := make(chan task.Response, 1)
+	request := task.Request{
 		Action:   task.CreateRequest,
 		Task:     taskToBeCreated,
 		Response: response,
 	}
-
 	select {
-	case h.TaskActor.RequestsChan <- request:
-		if err := <-response; err != nil {
-			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+	case task.RequestsChan <- request:
+		res := <-response
+		if res.Error != nil {
+			http.Error(w, res.Error.Error(), http.StatusBadRequest)
 			return
 		}
 		w.WriteHeader(http.StatusCreated)
@@ -43,29 +41,39 @@ func (h *Handlers) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handlers) GetHandler(w http.ResponseWriter, r *http.Request) {
+// GetHandler handles retrieving tasks
+func GetHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
 	}
 
-	response := make(chan interface{}, 1)
-	request := task.TaskRequest{
+	response := make(chan task.Response, 1)
+	request := task.Request{
 		Action:   task.GetRequest,
 		Response: response,
 	}
 
 	select {
-	case h.TaskActor.RequestsChan <- request:
-		tasks := <-response
+	case task.RequestsChan <- request:
+		res := <-response
+		if res.Error != nil {
+			http.Error(w, res.Error.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(tasks)
+		err := json.NewEncoder(w).Encode(res.Tasks)
+		if err != nil {
+			http.Error(w, res.Error.Error(), http.StatusInternalServerError)
+			return
+		}
 	default:
 		http.Error(w, "Service unavailable. Please try again later.", http.StatusServiceUnavailable)
 	}
 }
 
-func (h *Handlers) UpdateHandler(w http.ResponseWriter, r *http.Request) {
+// UpdateHandler handles task updates
+func UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
@@ -78,21 +86,22 @@ func (h *Handlers) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := make(chan interface{}, 1)
-	request := task.TaskRequest{
+	response := make(chan task.Response, 1)
+	request := task.Request{
 		Action:   task.UpdateRequest,
 		Task:     taskToBeUpdated,
 		Response: response,
 	}
 
 	select {
-	case h.TaskActor.RequestsChan <- request:
-		if err := <-response; err != nil {
-			if err == task.ErrTaskNotFound {
-				http.Error(w, err.(error).Error(), http.StatusNotFound)
+	case task.RequestsChan <- request:
+		res := <-response
+		if res.Error != nil {
+			if errors.Is(res.Error, task.ErrTaskNotFound) {
+				http.Error(w, res.Error.Error(), http.StatusNotFound)
 				return
 			}
-			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+			http.Error(w, res.Error.Error(), http.StatusBadRequest)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -101,7 +110,8 @@ func (h *Handlers) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handlers) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+// DeleteHandler handles task deletion
+func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
 		return
@@ -114,21 +124,22 @@ func (h *Handlers) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := make(chan interface{}, 1)
-	request := task.TaskRequest{
+	response := make(chan task.Response, 1)
+	request := task.Request{
 		Action:   task.DeleteRequest,
 		TaskID:   taskID,
 		Response: response,
 	}
 
 	select {
-	case h.TaskActor.RequestsChan <- request:
-		if err := <-response; err != nil {
-			if err == task.ErrTaskNotFound {
-				http.Error(w, err.(error).Error(), http.StatusNotFound)
+	case task.RequestsChan <- request:
+		res := <-response
+		if res.Error != nil {
+			if errors.Is(res.Error, task.ErrTaskNotFound) {
+				http.Error(w, res.Error.Error(), http.StatusNotFound)
 				return
 			}
-			http.Error(w, err.(error).Error(), http.StatusBadRequest)
+			http.Error(w, res.Error.Error(), http.StatusBadRequest)
 			return
 		}
 		w.WriteHeader(http.StatusOK)

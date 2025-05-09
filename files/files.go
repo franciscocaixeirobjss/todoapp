@@ -20,7 +20,12 @@ func LoadData(filePath string, tasks *[]task.Task, maxTaskID *int) error {
 		}
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	data, err := io.ReadAll(file)
 	if err != nil {
@@ -34,9 +39,9 @@ func LoadData(filePath string, tasks *[]task.Task, maxTaskID *int) error {
 		return err
 	}
 
-	for _, task := range *tasks {
-		if task.ID > *maxTaskID {
-			*maxTaskID = task.ID
+	for _, loadedTask := range *tasks {
+		if loadedTask.ID > *maxTaskID {
+			*maxTaskID = loadedTask.ID
 		}
 	}
 
@@ -51,7 +56,12 @@ func SaveData(filename string, tasks []task.Task) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+
+		}
+	}(file)
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")

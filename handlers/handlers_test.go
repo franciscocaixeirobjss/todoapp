@@ -11,42 +11,26 @@ import (
 	"todoapp/task"
 )
 
-type MockTaskActor struct {
-	RequestsChan chan task.TaskRequest
-}
-
-func NewMockTaskActor(bufferSize int) *MockTaskActor {
-	return &MockTaskActor{
-		RequestsChan: make(chan task.TaskRequest, bufferSize),
-	}
-}
-
-func (m *MockTaskActor) FillChannel() {
-	for i := 0; i < cap(m.RequestsChan); i++ {
-		m.RequestsChan <- task.TaskRequest{
-			Action:   task.CreateRequest,
-			Task:     task.Task{Title: "Mock Task"},
-			Response: make(chan interface{}, 1),
-		}
-	}
+func TestMain(m *testing.M) {
+	m.Run()
 }
 
 func TestCreateHandler_ServiceUnavailable(t *testing.T) {
-	mockTaskActor := NewMockTaskActor(1)
+	mockRequestsChan := make(chan task.Request, 1)
+	task.RequestsChan = mockRequestsChan
 
-	mockTaskActor.FillChannel()
-
-	handlers := &Handlers{
-		TaskActor: &task.TaskActor{
-			RequestsChan: mockTaskActor.RequestsChan,
-		},
+	response := make(chan task.Response, 1)
+	mockRequestsChan <- task.Request{
+		Action:   task.CreateRequest,
+		Task:     task.Task{Title: "Mock Task"},
+		Response: response,
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task", "status": "NotStarted"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	handlers.CreateHandler(w, req)
+	CreateHandler(w, req)
 
 	resp := w.Result()
 	if resp.StatusCode != http.StatusServiceUnavailable {
@@ -55,19 +39,14 @@ func TestCreateHandler_ServiceUnavailable(t *testing.T) {
 }
 
 func TestCreateHandler_Parallel(t *testing.T) {
-	taskManager := &task.TaskManager{}
-	taskActor := task.NewTaskActor(taskManager, 100)
-
-	handlers := &Handlers{
-		TaskActor: taskActor,
-	}
+	task.InitTaskManager(&task.Manager{}, 100)
 
 	// Define test cases
-	tests := []struct {
+	var tests []struct {
 		name           string
 		taskID         int
 		expectedStatus int
-	}{}
+	}
 
 	for i := 0; i < 100; i++ {
 		tests = append(tests, struct {
@@ -89,7 +68,7 @@ func TestCreateHandler_Parallel(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			handlers.CreateHandler(w, req)
+			CreateHandler(w, req)
 
 			resp := w.Result()
 			if resp.StatusCode != tt.expectedStatus {
@@ -101,13 +80,7 @@ func TestCreateHandler_Parallel(t *testing.T) {
 
 func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 	numRequests := 100
-
-	taskManager := &task.TaskManager{}
-	taskActor := task.NewTaskActor(taskManager, numRequests)
-
-	handlers := &Handlers{
-		TaskActor: taskActor,
-	}
+	task.InitTaskManager(&task.Manager{}, numRequests)
 
 	var wg sync.WaitGroup
 
@@ -120,7 +93,7 @@ func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
-			handlers.CreateHandler(w, req)
+			CreateHandler(w, req)
 
 			resp := w.Result()
 			if resp.StatusCode != http.StatusCreated {
@@ -131,16 +104,24 @@ func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 
 	wg.Wait()
 
-	tasks := taskManager.GetTasks()
-	if len(tasks) != numRequests {
-		t.Errorf("Expected %d tasks, but got %d", numRequests, len(tasks))
+	response := make(chan task.Response, 1)
+	task.RequestsChan <- task.Request{
+		Action:   task.GetRequest,
+		Response: response,
 	}
+
+	res := <-response
+	if len(res.Tasks) != numRequests {
+		t.Errorf("Expected %d tasks, but got %d", numRequests, len(res.Tasks))
+	}
+	// tasks := (*task.TaskManager).GetTasks()
+	// if len(tasks) != numRequests {
+	// 	t.Errorf("Expected %d tasks, but got %d", numRequests, len(tasks))
+	// }
 }
 
 func TestCreateHandler(t *testing.T) {
-	mockTaskManager := &task.TaskManager{}
-	taskActor := task.NewTaskActor(mockTaskManager, 10)
-	handlers := &Handlers{TaskActor: taskActor}
+	task.InitTaskManager(&task.Manager{}, 10)
 
 	tests := []struct {
 		name             string
@@ -156,7 +137,7 @@ func TestCreateHandler(t *testing.T) {
 			expectedStatus: http.StatusCreated,
 		},
 		{
-			name:           "status bad request - innvalid json format",
+			name:           "status bad request - invalid json format",
 			method:         http.MethodPost,
 			data:           `{"title": "Invalid Task", "status":`,
 			expectedStatus: http.StatusBadRequest,
@@ -173,7 +154,7 @@ func TestCreateHandler(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/create", strings.NewReader(test.data))
 			rec := httptest.NewRecorder()
 
-			handlers.CreateHandler(rec, req)
+			CreateHandler(rec, req)
 
 			if rec.Code != test.expectedStatus {
 				t.Errorf("expected status code %d, got %d", test.expectedStatus, rec.Code)
@@ -183,15 +164,12 @@ func TestCreateHandler(t *testing.T) {
 }
 
 func TestGetHandler(t *testing.T) {
-	mockTaskManager := &task.TaskManager{
+	task.InitTaskManager(&task.Manager{
 		Tasks: []task.Task{
 			{ID: 1, Title: "Task 1", Deleted: false},
 			{ID: 2, Title: "Task 2", Deleted: true},
 		},
-	}
-
-	taskActor := task.NewTaskActor(mockTaskManager, 10)
-	handlers := &Handlers{TaskActor: taskActor}
+	}, 10)
 
 	tests := []struct {
 		name             string
@@ -219,7 +197,7 @@ func TestGetHandler(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/get", nil)
 			rec := httptest.NewRecorder()
 
-			handlers.GetHandler(rec, req)
+			GetHandler(rec, req)
 
 			if rec.Code != test.expectedStatus {
 				t.Errorf("expected status code %d, got %d", test.expectedStatus, rec.Code)
@@ -241,14 +219,11 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestUpdateHandler(t *testing.T) {
-	mockTaskManager := &task.TaskManager{
+	task.InitTaskManager(&task.Manager{
 		Tasks: []task.Task{
 			{ID: 1, Title: "Task 1", StatusString: "NotStarted"},
 		},
-	}
-
-	taskActor := task.NewTaskActor(mockTaskManager, 10)
-	handlers := &Handlers{TaskActor: taskActor}
+	}, 10)
 
 	tests := []struct {
 		name           string
@@ -280,7 +255,7 @@ func TestUpdateHandler(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/update", strings.NewReader(test.data))
 			rec := httptest.NewRecorder()
 
-			handlers.UpdateHandler(rec, req)
+			UpdateHandler(rec, req)
 
 			if rec.Code != test.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", test.expectedStatus, rec.Code)
@@ -290,15 +265,12 @@ func TestUpdateHandler(t *testing.T) {
 }
 
 func TestDeleteHandler(t *testing.T) {
-	mockTaskManager := &task.TaskManager{
+	task.InitTaskManager(&task.Manager{
 		Tasks: []task.Task{
 			{ID: 1, Title: "Task 1", Deleted: false},
 			{ID: 2, Title: "Task 2", Deleted: true},
 		},
-	}
-
-	taskActor := task.NewTaskActor(mockTaskManager, 10)
-	handlers := &Handlers{TaskActor: taskActor}
+	}, 10)
 
 	tests := []struct {
 		name           string
@@ -343,7 +315,7 @@ func TestDeleteHandler(t *testing.T) {
 			req, _ := http.NewRequest(test.method, test.url, nil)
 			rec := httptest.NewRecorder()
 
-			handlers.DeleteHandler(rec, req)
+			DeleteHandler(rec, req)
 
 			if rec.Code != test.expectedStatus {
 				t.Errorf("Expected status code %d, got %d", test.expectedStatus, rec.Code)

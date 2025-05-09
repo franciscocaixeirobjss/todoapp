@@ -15,7 +15,7 @@ func ServeStaticPage(mux *http.ServeMux) {
 }
 
 // ServeDynamicPage serves a dynamic "list" page with all tasks
-func ServeDynamicPage(mux *http.ServeMux, taskManager *task.TaskManager) {
+func ServeDynamicPage(mux *http.ServeMux, taskManager *task.Manager) {
 	mux.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			slog.Error("Invalid HTTP method", "method", r.Method)

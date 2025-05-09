@@ -23,41 +23,6 @@ const (
 	DeleteRequest = "delete"
 )
 
-// Task represents a to-do task
-type Task struct {
-	ID           int        `json:"id"`
-	Title        string     `json:"title"`
-	Description  string     `json:"description"`
-	StatusID     Status     `json:"status_id"`
-	StatusString string     `json:"status"`
-	CreatedAt    *time.Time `json:"created_at"`
-	UpdatedAt    *time.Time `json:"updated_at"`
-	DueDate      *time.Time `json:"due_date"`
-	DeletedAt    *time.Time `json:"deleted_at"`
-	Deleted      bool       `json:"deleted"`
-}
-
-// TaskManager struct to manage tasks and their state
-// FIXME: Rename to avoid starting with the package name
-type TaskManager struct {
-	Tasks     []Task
-	MaxTaskID int
-}
-
-// FIXME: Rename to avoid starting with the package name
-type TaskRequest struct {
-	Action   string
-	Task     Task
-	TaskID   int
-	Response chan<- interface{}
-}
-
-// FIXME: Rename to avoid starting with the package name
-type TaskActor struct {
-	TaskManager  *TaskManager
-	RequestsChan chan TaskRequest
-}
-
 var (
 	// ErrTaskNotFound is returned when a task is not found
 	ErrTaskNotFound = errors.New("task not found")
@@ -65,39 +30,42 @@ var (
 	ErrInvalidStatus = errors.New("invalid status string")
 )
 
-func NewTaskActor(taskManager *TaskManager, requestChanSize int) *TaskActor {
-	actor := &TaskActor{
-		TaskManager:  taskManager,
-		RequestsChan: make(chan TaskRequest, requestChanSize),
-	}
-	go actor.processLoop()
-	return actor
+var (
+	taskManager  *Manager
+	RequestsChan chan Request
+)
+
+// InitTaskManager initializes the TaskManager and RequestsChan
+func InitTaskManager(tm *Manager, requestChanSize int) {
+	taskManager = tm
+	RequestsChan = make(chan Request, requestChanSize)
+	go processLoop()
 }
 
-func (ta *TaskActor) processLoop() {
-	for req := range ta.RequestsChan {
+func processLoop() {
+	for req := range RequestsChan {
 		switch req.Action {
 		case CreateRequest:
-			err := ta.TaskManager.CreateTask(req.Task)
-			req.Response <- err
+			err := taskManager.CreateTask(req.Task)
+			req.Response <- Response{Tasks: nil, Error: err}
 		case GetRequest:
-			tasks := ta.TaskManager.GetTasks()
-			req.Response <- tasks
+			tasks := taskManager.GetTasks()
+			req.Response <- Response{Tasks: tasks, Error: nil}
 		case UpdateRequest:
-			err := ta.TaskManager.UpdateTask(req.Task)
-			req.Response <- err
+			err := taskManager.UpdateTask(req.Task)
+			req.Response <- Response{Tasks: nil, Error: err}
 		case DeleteRequest:
-			err := ta.TaskManager.DeleteTask(req.TaskID)
-			req.Response <- err
+			err := taskManager.DeleteTask(req.TaskID)
+			req.Response <- Response{Tasks: nil, Error: err}
 		default:
-			req.Response <- errors.New("unknown action")
+			req.Response <- Response{Tasks: nil, Error: errors.New("unknown action")}
 		}
 		close(req.Response)
 	}
 }
 
 // CreateTask adds a new task to the list of tasks
-func (tm *TaskManager) CreateTask(task Task) error {
+func (tm *Manager) CreateTask(task Task) error {
 	now := time.Now()
 
 	statusID, err := convertStringToStatusID(task.StatusString)
@@ -115,7 +83,7 @@ func (tm *TaskManager) CreateTask(task Task) error {
 }
 
 // GetTasks retrieves all non-deleted tasks
-func (tm *TaskManager) GetTasks() []Task {
+func (tm *Manager) GetTasks() []Task {
 	var currentTasks []Task
 	for _, task := range tm.Tasks {
 		if !task.Deleted {
@@ -126,29 +94,22 @@ func (tm *TaskManager) GetTasks() []Task {
 }
 
 // UpdateTask updates an existing task
-func (tm *TaskManager) UpdateTask(updatedTask Task) error {
-	now := time.Now()
-
-	statusID, err := convertStringToStatusID(updatedTask.StatusString)
-	if err != nil {
-		return ErrInvalidStatus
-	}
-
+func (tm *Manager) UpdateTask(updatedTask Task) error {
 	for i, task := range tm.Tasks {
-		if task.ID == updatedTask.ID && !task.Deleted {
-			updatedTask.StatusID = statusID
-			updatedTask.CreatedAt = task.CreatedAt
-			updatedTask.UpdatedAt = &now
-			tm.Tasks[i] = updatedTask
+		if task.ID == updatedTask.ID {
+			now := time.Now()
+			tm.Tasks[i].Title = updatedTask.Title
+			tm.Tasks[i].Description = updatedTask.Description
+			tm.Tasks[i].StatusID, _ = convertStringToStatusID(updatedTask.StatusString)
+			tm.Tasks[i].UpdatedAt = &now
 			return nil
 		}
 	}
-
 	return ErrTaskNotFound
 }
 
 // DeleteTask marks a task as deleted
-func (tm *TaskManager) DeleteTask(taskID int) error {
+func (tm *Manager) DeleteTask(taskID int) error {
 	now := time.Now()
 
 	for i, task := range tm.Tasks {

@@ -1,23 +1,21 @@
 package task
 
 import (
-	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestMain(m *testing.M) {
-	code := m.Run()
-	os.Exit(code)
+	// Initialize the TaskManager and RequestsChan before running tests
+	InitTaskManager(&Manager{}, 100)
+	m.Run()
 }
 
 func TestTaskActor_Concurrency(t *testing.T) {
 	numGoroutines := 100
-
-	taskManager := &TaskManager{}
-	taskActor := NewTaskActor(taskManager, numGoroutines)
 
 	var wg sync.WaitGroup
 
@@ -26,8 +24,8 @@ func TestTaskActor_Concurrency(t *testing.T) {
 		go func(taskID int) {
 			defer wg.Done()
 
-			response := make(chan interface{})
-			taskActor.RequestsChan <- TaskRequest{
+			response := make(chan Response)
+			RequestsChan <- Request{
 				Action: CreateRequest,
 				Task: Task{
 					Title:        "Task " + strconv.Itoa(taskID),
@@ -37,35 +35,34 @@ func TestTaskActor_Concurrency(t *testing.T) {
 				Response: response,
 			}
 
-			if err := <-response; err != nil {
-				t.Errorf("Failed to add task: %v", err)
+			if res := <-response; res.Error != nil {
+				t.Errorf("Failed to add task: %v", res.Error)
 			}
 		}(i)
 	}
 
 	wg.Wait()
 
-	response := make(chan interface{})
-	taskActor.RequestsChan <- TaskRequest{
+	response := make(chan Response)
+	RequestsChan <- Request{
 		Action:   GetRequest,
 		Response: response,
 	}
 
-	tasks := <-response
-	if len(tasks.([]Task)) != numGoroutines {
-		t.Errorf("Expected %d tasks, but got %d", numGoroutines, len(tasks.([]Task)))
+	res := <-response
+	if len(res.Tasks) != numGoroutines {
+		t.Errorf("Expected %d tasks, but got %d", numGoroutines, len(res.Tasks))
 	}
 }
 
 func TestTaskActor_ConcurrentUpdate(t *testing.T) {
+	InitTaskManager(&Manager{}, 100)
+
 	numGoroutines := 50
+	var wg sync.WaitGroup
 
-	taskManager := &TaskManager{}
-	taskActor := NewTaskActor(taskManager, numGoroutines)
-
-	// Add a single task
-	response := make(chan interface{})
-	taskActor.RequestsChan <- TaskRequest{
+	response := make(chan Response, 1)
+	RequestsChan <- Request{
 		Action: CreateRequest,
 		Task: Task{
 			Title:        "Initial Task",
@@ -74,17 +71,17 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 		},
 		Response: response,
 	}
-	<-response
+	if res := <-response; res.Error != nil {
+		t.Fatalf("Failed to create task: %v", res.Error)
+	}
 
-	// Concurrently update the task
-	var wg sync.WaitGroup
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(updateID int) {
 			defer wg.Done()
 
-			response := make(chan interface{})
-			taskActor.RequestsChan <- TaskRequest{
+			response := make(chan Response, 1)
+			RequestsChan <- Request{
 				Action: UpdateRequest,
 				Task: Task{
 					ID:           1,
@@ -95,30 +92,39 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 				Response: response,
 			}
 
-			if err := <-response; err != nil {
-				t.Errorf("Failed to update task: %v", err)
+			if res := <-response; res.Error != nil {
+				t.Errorf("Failed to update task: %v", res.Error)
 			}
 		}(i)
 	}
 
 	wg.Wait()
 
-	// Verify the final state of the task
-	response = make(chan interface{})
-	taskActor.RequestsChan <- TaskRequest{
+	response = make(chan Response, 1)
+	RequestsChan <- Request{
 		Action:   GetRequest,
 		Response: response,
 	}
 
-	tasks := <-response
-	if len(tasks.([]Task)) != 1 {
-		t.Errorf("Expected 1 task, but got %d", len(tasks.([]Task)))
+	res := <-response
+	if len(res.Tasks) != 1 {
+		t.Errorf("Expected 1 task, but got %d", len(res.Tasks))
+	}
+
+	finalTask := res.Tasks[0]
+	if finalTask.ID != 1 {
+		t.Errorf("Expected task ID to be 1, but got %d", finalTask.ID)
+	}
+	if finalTask.StatusID != Started {
+		t.Errorf("Expected task status to be Started, but got %d", finalTask.StatusID)
+	}
+	if !strings.HasPrefix(finalTask.Title, "Updated Task") {
+		t.Errorf("Expected task title to start with 'Updated Task', but got '%s'", finalTask.Title)
 	}
 }
 
-// Test adding a task with an empty title or invalid status.
 func TestCreateTask(t *testing.T) {
-	tm := &TaskManager{
+	tm := &Manager{
 		Tasks:     []Task{},
 		MaxTaskID: 0,
 	}
@@ -148,7 +154,7 @@ func TestCreateTask(t *testing.T) {
 }
 
 func TestGetTasks(t *testing.T) {
-	tm := &TaskManager{
+	tm := &Manager{
 		Tasks: []Task{
 			{ID: 1, Title: "Task 1", Deleted: false},
 			{ID: 2, Title: "Task 2", Deleted: true},
@@ -168,7 +174,7 @@ func TestGetTasks(t *testing.T) {
 
 func TestUpdateTask(t *testing.T) {
 	now := time.Now()
-	tm := &TaskManager{
+	tm := &Manager{
 		Tasks: []Task{
 			{ID: 1, Title: "Task 1", StatusString: "NotStarted", CreatedAt: &now},
 		},
@@ -200,7 +206,7 @@ func TestUpdateTask(t *testing.T) {
 
 func TestDeleteTask(t *testing.T) {
 	now := time.Now()
-	tm := &TaskManager{
+	tm := &Manager{
 		Tasks: []Task{
 			{ID: 1, Title: "Task 1", Deleted: false, CreatedAt: &now},
 		},
