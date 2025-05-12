@@ -39,7 +39,7 @@ func main() {
 	task.InitChannel(*requestChanSize)
 
 	defer func() {
-		tasks, maxTaskID = task.GetManagerTasks()
+		tasks, _ = task.GetManagerTasks()
 		if err := files.SaveData("todo.json", tasks); err != nil {
 			slog.Error("Failed to save tasks to file", "error", err)
 		} else {
