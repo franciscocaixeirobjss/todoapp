@@ -116,8 +116,8 @@
     "created_at": "2025-05-09T10:39:17.2372006+01:00",
     "updated_at": "2025-05-09T10:43:16.2035933+01:00",
     "due_date": "2025-05-15T00:00:00+01:00",
-    "deleted_at": "2025-05-09T16:43:52.1894315+01:00",
-    "deleted": true
+    "deleted_at": null,
+    "deleted": false
   },
   {
     "id": 11,
@@ -128,8 +128,8 @@
     "created_at": "2025-05-09T10:39:17.9557169+01:00",
     "updated_at": null,
     "due_date": null,
-    "deleted_at": "2025-05-09T16:46:33.059273+01:00",
-    "deleted": true
+    "deleted_at": null,
+    "deleted": false
   },
   {
     "id": 12,
@@ -146,10 +146,10 @@
   {
     "id": 13,
     "title": "Golang",
-    "description": "Task 7375fd9d-81bc-43d2-a8e7-f5965676ee4a",
+    "description": "Task 4c594f84-5904-497d-8835-577989509290",
     "status_id": 1,
     "status": "Not Started",
-    "created_at": "2025-05-09T16:43:35.9131752+01:00",
+    "created_at": "2025-05-12T08:49:29.5009857+01:00",
     "updated_at": null,
     "due_date": null,
     "deleted_at": null,
@@ -161,22 +161,10 @@
     "description": "Task 14 updated twice",
     "status_id": 3,
     "status": "Not Started",
-    "created_at": "2025-05-09T16:43:37.8292163+01:00",
-    "updated_at": "2025-05-09T16:46:22.5085505+01:00",
+    "created_at": "2025-05-12T08:49:50.0729054+01:00",
+    "updated_at": "2025-05-12T08:49:52.6237195+01:00",
     "due_date": null,
-    "deleted_at": null,
-    "deleted": false
-  },
-  {
-    "id": 15,
-    "title": "Golang",
-    "description": "Task cf534cd3-523e-4fde-a147-2c6ba397fb2b",
-    "status_id": 1,
-    "status": "Not Started",
-    "created_at": "2025-05-09T16:46:13.8391858+01:00",
-    "updated_at": null,
-    "due_date": null,
-    "deleted_at": null,
-    "deleted": false
+    "deleted_at": "2025-05-12T08:50:00.5482155+01:00",
+    "deleted": true
   }
 ]

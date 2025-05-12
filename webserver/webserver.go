@@ -15,7 +15,7 @@ func ServeStaticPage(mux *http.ServeMux) {
 }
 
 // ServeDynamicPage serves a dynamic "list" page with all tasks
-func ServeDynamicPage(mux *http.ServeMux, taskManager *task.Manager) {
+func ServeDynamicPage(mux *http.ServeMux) {
 	mux.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			slog.Error("Invalid HTTP method", "method", r.Method)
@@ -32,7 +32,7 @@ func ServeDynamicPage(mux *http.ServeMux, taskManager *task.Manager) {
 			return
 		}
 
-		tasks := taskManager.GetTasks()
+		tasks := task.GetTasks()
 		err = tmpl.Execute(w, tasks)
 		if err != nil {
 			slog.Error("Failed to execute template", "error", err)

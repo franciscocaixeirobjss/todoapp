@@ -27,17 +27,20 @@ func main() {
 	logger := slog.New(slogHandler)
 	slog.SetDefault(logger)
 
-	taskManager := &task.Manager{}
-	err := files.LoadData("todo.json", &taskManager.Tasks, &taskManager.MaxTaskID)
+	var tasks []task.Task
+	var maxTaskID int
+	err := files.LoadData("todo.json", &tasks, &maxTaskID)
 	if err != nil {
 		slog.Error("Failed to load data", "error", err)
 		return
 	}
 
-	task.InitTaskManager(taskManager, *requestChanSize)
+	task.SetTasks(tasks, maxTaskID)
+	task.InitChannel(*requestChanSize)
 
 	defer func() {
-		if err := files.SaveData("todo.json", taskManager.Tasks); err != nil {
+		tasks, maxTaskID = task.GetManagerTasks()
+		if err := files.SaveData("todo.json", tasks); err != nil {
 			slog.Error("Failed to save tasks to file", "error", err)
 		} else {
 			slog.Info("Tasks saved successfully")
@@ -51,7 +54,7 @@ func main() {
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
 
 	webserver.ServeStaticPage(mux)
-	webserver.ServeDynamicPage(mux, taskManager)
+	webserver.ServeDynamicPage(mux)
 
 	wrappedMux := middleware.TraceIDMiddleware(mux)
 

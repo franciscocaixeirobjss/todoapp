@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -39,7 +40,9 @@ func TestCreateHandler_ServiceUnavailable(t *testing.T) {
 }
 
 func TestCreateHandler_Parallel(t *testing.T) {
-	task.InitTaskManager(&task.Manager{}, 100)
+	task.InitChannel(100)
+
+	task.SetTasks([]task.Task{}, 0)
 
 	// Define test cases
 	var tests []struct {
@@ -80,7 +83,9 @@ func TestCreateHandler_Parallel(t *testing.T) {
 
 func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 	numRequests := 100
-	task.InitTaskManager(&task.Manager{}, numRequests)
+	task.InitChannel(numRequests)
+
+	task.SetTasks([]task.Task{}, 0)
 
 	var wg sync.WaitGroup
 
@@ -114,14 +119,10 @@ func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 	if len(res.Tasks) != numRequests {
 		t.Errorf("Expected %d tasks, but got %d", numRequests, len(res.Tasks))
 	}
-	// tasks := (*task.TaskManager).GetTasks()
-	// if len(tasks) != numRequests {
-	// 	t.Errorf("Expected %d tasks, but got %d", numRequests, len(tasks))
-	// }
 }
 
 func TestCreateHandler(t *testing.T) {
-	task.InitTaskManager(&task.Manager{}, 10)
+	task.InitChannel(10)
 
 	tests := []struct {
 		name             string
@@ -164,12 +165,12 @@ func TestCreateHandler(t *testing.T) {
 }
 
 func TestGetHandler(t *testing.T) {
-	task.InitTaskManager(&task.Manager{
-		Tasks: []task.Task{
-			{ID: 1, Title: "Task 1", Deleted: false},
-			{ID: 2, Title: "Task 2", Deleted: true},
-		},
-	}, 10)
+	task.InitChannel(10)
+
+	task.SetTasks([]task.Task{
+		{ID: 1, Title: "Task 1", Deleted: false},
+		{ID: 2, Title: "Task 2", Deleted: true},
+	}, 2)
 
 	tests := []struct {
 		name             string
@@ -218,12 +219,125 @@ func TestGetHandler(t *testing.T) {
 	}
 }
 
-func TestUpdateHandler(t *testing.T) {
-	task.InitTaskManager(&task.Manager{
-		Tasks: []task.Task{
-			{ID: 1, Title: "Task 1", StatusString: "NotStarted"},
+func TestTaskActor_Concurrency(t *testing.T) {
+	task.InitChannel(100)
+	numGoroutines := 100
+	var wg sync.WaitGroup
+
+	task.SetTasks([]task.Task{}, 0)
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(taskID int) {
+			defer wg.Done()
+
+			response := make(chan task.Response)
+			task.RequestsChan <- task.Request{
+				Action: task.CreateRequest,
+				Task: task.Task{
+					Title:        "Task " + strconv.Itoa(taskID),
+					Description:  "Description for Task " + strconv.Itoa(taskID),
+					StatusString: "NotStarted",
+				},
+				Response: response,
+			}
+
+			if res := <-response; res.Error != nil {
+				t.Errorf("Failed to add task: %v", res.Error)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	response := make(chan task.Response)
+	task.RequestsChan <- task.Request{
+		Action:   task.GetRequest,
+		Response: response,
+	}
+
+	res := <-response
+	if len(res.Tasks) != numGoroutines {
+		t.Errorf("Expected %d tasks, but got %d", numGoroutines, len(res.Tasks))
+	}
+}
+
+func TestTaskActor_ConcurrentUpdate(t *testing.T) {
+	task.InitChannel(100)
+
+	numGoroutines := 50
+	var wg sync.WaitGroup
+
+	task.SetTasks([]task.Task{}, 0)
+
+	response := make(chan task.Response, 1)
+	task.RequestsChan <- task.Request{
+		Action: task.CreateRequest,
+		Task: task.Task{
+			Title:        "Initial Task",
+			Description:  "Initial Description",
+			StatusString: "NotStarted",
 		},
-	}, 10)
+		Response: response,
+	}
+	if res := <-response; res.Error != nil {
+		t.Fatalf("Failed to create task: %v", res.Error)
+	}
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(updateID int) {
+			defer wg.Done()
+
+			response := make(chan task.Response, 1)
+			task.RequestsChan <- task.Request{
+				Action: task.UpdateRequest,
+				Task: task.Task{
+					ID:           1,
+					Title:        "Updated Task " + strconv.Itoa(updateID),
+					Description:  "Updated Description " + strconv.Itoa(updateID),
+					StatusString: "Started",
+				},
+				Response: response,
+			}
+
+			if res := <-response; res.Error != nil {
+				t.Errorf("Failed to update task: %v", res.Error)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	response = make(chan task.Response, 1)
+	task.RequestsChan <- task.Request{
+		Action:   task.GetRequest,
+		Response: response,
+	}
+
+	res := <-response
+	if len(res.Tasks) != 1 {
+		t.Errorf("Expected 1 task, but got %d", len(res.Tasks))
+	}
+
+	finalTask := res.Tasks[0]
+	if finalTask.ID != 1 {
+		t.Errorf("Expected task ID to be 1, but got %d", finalTask.ID)
+	}
+	if finalTask.StatusID != task.Started {
+		t.Errorf("Expected task status to be Started, but got %d", finalTask.StatusID)
+	}
+	if !strings.HasPrefix(finalTask.Title, "Updated Task") {
+		t.Errorf("Expected task title to start with 'Updated Task', but got '%s'", finalTask.Title)
+	}
+}
+
+func TestUpdateHandler(t *testing.T) {
+	task.InitChannel(10)
+
+	task.SetTasks([]task.Task{
+		{ID: 1, Title: "Task 1", StatusString: "NotStarted"},
+	}, 1)
 
 	tests := []struct {
 		name           string
@@ -265,12 +379,12 @@ func TestUpdateHandler(t *testing.T) {
 }
 
 func TestDeleteHandler(t *testing.T) {
-	task.InitTaskManager(&task.Manager{
-		Tasks: []task.Task{
-			{ID: 1, Title: "Task 1", Deleted: false},
-			{ID: 2, Title: "Task 2", Deleted: true},
-		},
-	}, 10)
+	task.InitChannel(10)
+
+	task.SetTasks([]task.Task{
+		{ID: 1, Title: "Task 1", Deleted: false},
+		{ID: 2, Title: "Task 2", Deleted: true},
+	}, 2)
 
 	tests := []struct {
 		name           string
