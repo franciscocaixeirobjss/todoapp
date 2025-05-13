@@ -10,6 +10,41 @@ func TestMain(m *testing.M) {
 	m.Run()
 }
 
+func BenchmarkActorPattern(b *testing.B) {
+	InitChannel(100) // Initialize the actor pattern with a request channel
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			response := make(chan Response)
+			RequestsChan <- Request{
+				Action: CreateRequest,
+				Task: Task{
+					Title:        "Benchmark Task",
+					Description:  "This is a benchmark task",
+					StatusString: "NotStarted",
+				},
+				Response: response,
+			}
+			<-response
+		}
+	})
+}
+
+// Benchmark for the non-actor pattern
+func BenchmarkNonActorPattern(b *testing.B) {
+	manager := &NonActorManager{}
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			manager.CreateTask(Task{
+				Title:        "Benchmark Task",
+				Description:  "This is a benchmark task",
+				StatusString: "NotStarted",
+			})
+		}
+	})
+}
+
 func TestCreateTask(t *testing.T) {
 	SetTasks([]Task{}, 0)
 
