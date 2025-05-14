@@ -335,6 +335,63 @@ ok      todoapp/handlers        4.256s
 
 -----
 
+# Benchmark Results
+
+## Task Module
+
+### Create
+- **Non-Actor Pattern**: ~200 ns/op with 1 allocation  
+- **Actor Pattern**: ~600 ns/op with 2 allocations  
+✅ *The Non-Actor Pattern outperformed the Actor Pattern in terms of speed and memory usage.*
+
+### Update
+- **Non-Actor Pattern**: ~90 ns/op~
+- **Actor Pattern**: ~440 ns/op~ 
+✅ *The Non-Actor Pattern was significantly faster.*
+
+---
+
+## Handlers Module
+
+### CreateHandler
+- **Non-Actor Pattern**: ~2100 ns/op, ~7600 B/op, 33 allocations  
+- **Actor Pattern**: ~2500 ns/op, ~7800 B/op, 35 allocations  
+✅ *The Non-Actor Pattern was slightly faster and more memory-efficient.*
+
+### UpdateHandler
+- **Non-Actor Pattern**: ~3600 ns/op, ~7000 B/op, 33 allocations  
+- **Actor Pattern**: ~3200 ns/op, ~7200 B/op, 34 allocations  
+✅ *The Actor Pattern performed slightly better in this case.*
+
+-----
+
+# Channel Buffering Impact
+
+Benchmarks with buffered channels and larger `RequestChan` sizes (1M) showed improved performance compared to unbuffered channels:
+
+- Buffered channels reduced latency and memory usage in both `CreateHandler` and `UpdateHandler`.
+- Smaller `RequestChan` sizes (e.g., 100) resulted in higher latency and slower performance due to increased contention.
+
+---
+
+# Key Takeaways
+
+## Non-Actor Pattern
+- Generally faster and more memory-efficient for task operations.
+- Suitable for low-concurrency scenarios or when simplicity is preferred.
+
+## Actor Pattern
+- Performs well under high-concurrency scenarios due to its single-threaded nature and avoidance of locks.
+- Slightly slower and more memory-intensive compared to the Non-Actor Pattern.
+
+## Channel Buffering
+- Buffered channels and larger `RequestChan` sizes significantly improve performance by reducing contention and latency.
+
+## Thread Safety
+- All concurrency and parallel tests passed, indicating that both patterns handle concurrent operations safely.
+
+-----
+
 # Dependencies
 - Go 1.22 or higher
 - Modules:
