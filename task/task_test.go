@@ -11,7 +11,7 @@ func TestMain(m *testing.M) {
 }
 
 func BenchmarkActorPattern(b *testing.B) {
-	InitChannel(100) // Initialize the actor pattern with a request channel
+	InitChannel(1000)
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {

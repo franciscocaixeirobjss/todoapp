@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,8 +13,176 @@ import (
 	"todoapp/task"
 )
 
+var channelSizeBenchmark = 100
+
 func TestMain(m *testing.M) {
 	m.Run()
+}
+
+func BenchmarkUpdateHandlerNonActor(b *testing.B) {
+	manager := &task.NonActorManager{}
+
+	for i := 0; i < 1; i++ {
+		manager.CreateTask(task.Task{
+			Title:        "Task " + strconv.Itoa(i),
+			Description:  "Description " + strconv.Itoa(i),
+			StatusString: "NotStarted",
+		})
+	}
+
+	updatedTask := task.Task{
+		ID:           1,
+		Title:        "Updated Task",
+		Description:  "Updated Description",
+		StatusString: "Started",
+	}
+	updatedTaskJSON, _ := json.Marshal(updatedTask)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			req := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			UpdateHandlerWithManager(w, req, manager)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusOK {
+				b.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
+			}
+		}
+	})
+}
+
+func BenchmarkUpdateHandlerActor_NoParallel(b *testing.B) {
+	task.InitChannel(channelSizeBenchmark)
+
+	response := make(chan task.Response, 1)
+	task.RequestsChan <- task.Request{
+		Action: task.CreateRequest,
+		Task: task.Task{
+			Title:        "Initial Task",
+			Description:  "Initial Description",
+			StatusString: "NotStarted",
+		},
+		Response: response,
+	}
+	<-response
+
+	updatedTask := task.Task{
+		ID:           1,
+		Title:        "Updated Task",
+		Description:  "Updated Description",
+		StatusString: "Started",
+	}
+	updatedTaskJSON, _ := json.Marshal(updatedTask)
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+
+		r.Header.Set("Content-Type", "application/json")
+		UpdateHandler(w, r)
+
+		if w.Code != http.StatusOK {
+			b.Errorf("wanted status %d, got %d", http.StatusOK, w.Code)
+		}
+
+	}
+}
+
+func BenchmarkUpdateHandlerActor(b *testing.B) {
+	task.InitChannel(channelSizeBenchmark)
+
+	response := make(chan task.Response, 1)
+	task.RequestsChan <- task.Request{
+		Action: task.CreateRequest,
+		Task: task.Task{
+			Title:        "Initial Task",
+			Description:  "Initial Description",
+			StatusString: "NotStarted",
+		},
+		Response: response,
+	}
+	<-response
+
+	updatedTask := task.Task{
+		ID:           1,
+		Title:        "Updated Task",
+		Description:  "Updated Description",
+		StatusString: "Started",
+	}
+	updatedTaskJSON, _ := json.Marshal(updatedTask)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			req := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			UpdateHandler(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusOK {
+				b.Errorf("Expected status %d, got %d", http.StatusOK, resp.StatusCode)
+			}
+		}
+	})
+}
+
+func BenchmarkCreateHandlerNonActor(b *testing.B) {
+	manager := &task.NonActorManager{}
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			CreateHandlerWithManager(w, req, manager)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusCreated {
+				b.Errorf("Expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+			}
+		}
+	})
+}
+
+func BenchmarkCreateHandlerActor_NoParallel(b *testing.B) {
+	task.InitChannel(channelSizeBenchmark)
+
+	for i := 0; i < b.N; i++ {
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+
+		r.Header.Set("Content-Type", "application/json")
+		CreateHandler(w, r)
+
+		if w.Code != http.StatusCreated {
+			b.Errorf("wanted status %d, got %d", http.StatusOK, w.Code)
+		}
+
+	}
+}
+
+func BenchmarkCreateHandlerActor(b *testing.B) {
+	task.InitChannel(channelSizeBenchmark)
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+
+			CreateHandler(w, req)
+
+			resp := w.Result()
+			if resp.StatusCode != http.StatusCreated {
+				b.Errorf("Expected status %d, got %d", http.StatusCreated, resp.StatusCode)
+			}
+		}
+	})
 }
 
 func TestCreateHandler_ServiceUnavailable(t *testing.T) {
