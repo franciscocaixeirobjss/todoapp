@@ -6,11 +6,64 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	InitChannel(100)
 	m.Run()
 }
 
-func BenchmarkActorPattern(b *testing.B) {
+func BenchmarkUpdateActorPattern(b *testing.B) {
+	InitChannel(1000)
+
+	response := make(chan Response)
+	RequestsChan <- Request{
+		Action: CreateRequest,
+		Task: Task{
+			Title:        "Initial Task",
+			Description:  "Initial Description",
+			StatusString: "NotStarted",
+		},
+		Response: response,
+	}
+	<-response
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			response := make(chan Response)
+			RequestsChan <- Request{
+				Action: UpdateRequest,
+				Task: Task{
+					ID:           1,
+					Title:        "Updated Task",
+					Description:  "Updated Description",
+					StatusString: "Started",
+				},
+				Response: response,
+			}
+			<-response
+		}
+	})
+}
+
+func BenchmarkUpdateNonActorPattern(b *testing.B) {
+	manager := &NonActorManager{}
+
+	manager.CreateTask(Task{
+		Title:        "Initial Task",
+		Description:  "Initial Description",
+		StatusString: "NotStarted",
+	})
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			manager.UpdateTask(Task{
+				ID:           1,
+				Title:        "Updated Task",
+				Description:  "Updated Description",
+				StatusString: "Started",
+			})
+		}
+	})
+}
+
+func BenchmarkCreateActorPattern(b *testing.B) {
 	InitChannel(1000)
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -31,7 +84,7 @@ func BenchmarkActorPattern(b *testing.B) {
 }
 
 // Benchmark for the non-actor pattern
-func BenchmarkNonActorPattern(b *testing.B) {
+func BenchmarkCreateNonActorPattern(b *testing.B) {
 	manager := &NonActorManager{}
 
 	b.RunParallel(func(pb *testing.PB) {

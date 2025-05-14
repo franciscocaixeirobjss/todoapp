@@ -24,7 +24,7 @@ go run main.go
 create -title Task1 -description Description1 -status NotStarted
 ```
 - *list*: List all tasks.
-```
+
 - *exit*: Exist the CLI.
 
 -----
@@ -90,30 +90,40 @@ curl -X DELETE http://localhost:8080/delete/1
 -----
 # Benchmarking Task
 
-## Benchmark Actor Pattern
+## Benchmark Create 
 ``` bash
-> go test -benchmem -run=^$ -bench ^BenchmarkActorPattern$ todoapp/task
+> go test -benchmem -run=^ -bench ^BenchmarkCreate -count 3  todoapp/task
 
 goos: windows
 goarch: amd64
 pkg: todoapp/task
 cpu: Intel(R) Core(TM) i7-10610U CPU @ 1.80GHz
-BenchmarkActorPattern-8          1747880               678.8 ns/op           677 B/op          2 allocs/op
+BenchmarkCreateActorPattern-8            2030899               524.4 ns/op           601 B/op          2 allocs/op
+BenchmarkCreateActorPattern-8            1579746               666.5 ns/op           532 B/op          2 allocs/op
+BenchmarkCreateActorPattern-8            2094079               618.8 ns/op           719 B/op          2 allocs/op
+BenchmarkCreateNonActorPattern-8         5433957               198.7 ns/op           599 B/op          1 allocs/op
+BenchmarkCreateNonActorPattern-8         8821278               221.3 ns/op           577 B/op          1 allocs/op
+BenchmarkCreateNonActorPattern-8         8959837               212.5 ns/op           569 B/op          1 allocs/op
 PASS
-ok      todoapp/task    3.389s
+ok      todoapp/task    16.088s
 ```
 
-## Benchmark Non Actor Pattern
+## Benchmark Update
 ``` bash
-> go test -benchmem -run=^$ -bench ^BenchmarkNonActorPattern$ todoapp/task
+> go test -benchmem -run=^ -bench ^BenchmarkUpdate -count 3  todoapp/task
 
 goos: windows
 goarch: amd64
 pkg: todoapp/task
 cpu: Intel(R) Core(TM) i7-10610U CPU @ 1.80GHz
-BenchmarkNonActorPattern-8       5565408               260.2 ns/op           585 B/op          1 allocs/op
+BenchmarkUpdateActorPattern-8            2729719               439.6 ns/op           136 B/op          2 allocs/op
+BenchmarkUpdateActorPattern-8            2590282               496.7 ns/op           136 B/op          2 allocs/op
+BenchmarkUpdateActorPattern-8            2438349               440.4 ns/op           136 B/op          2 allocs/op
+BenchmarkUpdateNonActorPattern-8        12953227                91.17 ns/op           24 B/op          1 allocs/op
+BenchmarkUpdateNonActorPattern-8        13277992                87.23 ns/op           24 B/op          1 allocs/op
+BenchmarkUpdateNonActorPattern-8        13183190                90.77 ns/op           24 B/op          1 allocs/op
 PASS
-ok      todoapp/task    2.017s
+ok      todoapp/task    11.054s
 ```
 
 -----
