@@ -239,6 +239,101 @@ ok      todoapp/handlers        12.007s
 ```
 
 -----
+# Unit tests
+
+## Task
+``` bash
+> go test -race -v
+
+=== RUN   TestCreateTask
+--- PASS: TestCreateTask (0.00s)
+=== RUN   TestGetTasks
+--- PASS: TestGetTasks (0.00s)
+=== RUN   TestUpdateTask
+--- PASS: TestUpdateTask (0.00s)
+=== RUN   TestDeleteTask
+--- PASS: TestDeleteTask (0.00s)
+=== RUN   TestConvertStringToStatusID
+=== RUN   TestConvertStringToStatusID/NotStarted
+=== RUN   TestConvertStringToStatusID/_Not_Started_
+=== RUN   TestConvertStringToStatusID/Started
+=== RUN   TestConvertStringToStatusID/Completed
+=== RUN   TestConvertStringToStatusID/Invalid_Status
+=== RUN   TestConvertStringToStatusID/InvalidStatus
+--- PASS: TestConvertStringToStatusID (0.00s)
+    --- PASS: TestConvertStringToStatusID/NotStarted (0.00s)
+    --- PASS: TestConvertStringToStatusID/_Not_Started_ (0.00s)
+    --- PASS: TestConvertStringToStatusID/Started (0.00s)
+    --- PASS: TestConvertStringToStatusID/Completed (0.00s)
+    --- PASS: TestConvertStringToStatusID/Invalid_Status (0.00s)
+    --- PASS: TestConvertStringToStatusID/InvalidStatus (0.00s)
+PASS
+ok      todoapp/task    2.988s
+```
+
+## Handlers
+``` bash
+> go test -race -v
+
+=== RUN   TestCreateHandler_ServiceUnavailable
+--- PASS: TestCreateHandler_ServiceUnavailable (0.00s)
+=== RUN   TestCreateHandler_Parallel
+=== RUN   TestCreateHandler_Parallel/Task_0
+=== PAUSE TestCreateHandler_Parallel/Task_0
+...
+=== CONT  TestCreateHandler_Parallel/Task_0
+=== CONT  TestCreateHandler_Parallel/Task_3
+--- PASS: TestCreateHandler_Parallel (0.02s)
+    --- PASS: TestCreateHandler_Parallel/Task_1 (0.00s)
+    --- PASS: TestCreateHandler_Parallel/Task_53 (0.00s)
+    ...
+    --- PASS: TestCreateHandler_Parallel/Task_0 (0.00s)
+    --- PASS: TestCreateHandler_Parallel/Task_3 (0.00s)
+=== RUN   TestCreateHandler_Goroutine_Parallel
+--- PASS: TestCreateHandler_Goroutine_Parallel (0.00s)
+=== RUN   TestCreateHandler
+=== RUN   TestCreateHandler/valid_create_request
+=== RUN   TestCreateHandler/status_bad_request_-_invalid_json_format
+=== RUN   TestCreateHandler/method_not_allowed_-_get_request_instead_of_post
+--- PASS: TestCreateHandler (0.00s)
+    --- PASS: TestCreateHandler/valid_create_request (0.00s)
+    --- PASS: TestCreateHandler/status_bad_request_-_invalid_json_format (0.00s)
+    --- PASS: TestCreateHandler/method_not_allowed_-_get_request_instead_of_post (0.00s)
+=== RUN   TestGetHandler
+=== RUN   TestGetHandler/valid_get_request
+=== RUN   TestGetHandler/method_not_allowed_-_post_request_instead_of_get
+--- PASS: TestGetHandler (0.00s)
+    --- PASS: TestGetHandler/valid_get_request (0.00s)
+    --- PASS: TestGetHandler/method_not_allowed_-_post_request_instead_of_get (0.00s)
+=== RUN   TestTaskActor_Concurrency
+--- PASS: TestTaskActor_Concurrency (0.00s)
+=== RUN   TestTaskActor_ConcurrentUpdate
+--- PASS: TestTaskActor_ConcurrentUpdate (0.00s)
+=== RUN   TestUpdateHandler
+=== RUN   TestUpdateHandler/valid_update_request
+=== RUN   TestUpdateHandler/not_found_-_non-existing_id
+=== RUN   TestUpdateHandler/method_not_allowed_-_post_request_instead_of_put
+--- PASS: TestUpdateHandler (0.00s)
+    --- PASS: TestUpdateHandler/valid_update_request (0.00s)
+    --- PASS: TestUpdateHandler/not_found_-_non-existing_id (0.00s)
+    --- PASS: TestUpdateHandler/method_not_allowed_-_post_request_instead_of_put (0.00s)
+=== RUN   TestDeleteHandler
+=== RUN   TestDeleteHandler/valid_delete_request
+=== RUN   TestDeleteHandler/not_found_-_non-existing_id
+=== RUN   TestDeleteHandler/not_found_-_already_deleted_task
+=== RUN   TestDeleteHandler/bad_request_-_invalid_task_ID
+=== RUN   TestDeleteHandler/method_not_allowed_-_post_request_instead_of_delete
+--- PASS: TestDeleteHandler (0.00s)
+    --- PASS: TestDeleteHandler/valid_delete_request (0.00s)
+    --- PASS: TestDeleteHandler/not_found_-_non-existing_id (0.00s)
+    --- PASS: TestDeleteHandler/not_found_-_already_deleted_task (0.00s)
+    --- PASS: TestDeleteHandler/bad_request_-_invalid_task_ID (0.00s)
+    --- PASS: TestDeleteHandler/method_not_allowed_-_post_request_instead_of_delete (0.00s)
+PASS
+ok      todoapp/handlers        4.256s
+```
+
+-----
 
 # Dependencies
 - Go 1.22 or higher
