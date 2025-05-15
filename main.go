@@ -1,83 +1,50 @@
 package main
 
 import (
-	"errors"
 	"flag"
-	"log/slog"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"todoapp/files"
 	"todoapp/handlers"
+	"todoapp/logging"
 	"todoapp/middleware"
-	"todoapp/task"
-	"todoapp/webserver"
 )
 
 func main() {
-	requestChanSize := flag.Int("requestChanSize", 10, "Size of the request channel")
+	port := flag.String("port", "8080", "Port to run the backend server on")
 	flag.Parse()
 
-	opts := &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}
+	logging.InitLogging(*port)
 
-	slogHandler := slog.NewTextHandler(os.Stdout, opts)
-	logger := slog.New(slogHandler)
-	slog.SetDefault(logger)
+	mux := createMux()
 
-	var tasks []task.Task
-	var maxTaskID int
-	err := files.LoadData("todo.json", &tasks, &maxTaskID)
-	if err != nil {
-		slog.Error("Failed to load data", "error", err)
-		return
-	}
+	wrappedMux := middleware.ChainMiddleware(mux,
+		middleware.LoadBalancerMiddleware,
+		middleware.TraceIDMiddleware,
+		middleware.UserIDMiddleware)
 
-	task.SetTasks(tasks, maxTaskID)
-	task.InitChannel(*requestChanSize)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	defer func() {
-		tasks, _ = task.GetManagerTasks()
-		if err := files.SaveData("todo.json", tasks); err != nil {
-			slog.Error("Failed to save tasks to file", "error", err)
-		} else {
-			slog.Info("Tasks saved successfully")
+	go func() {
+		log.Printf("Starting server on %s", *port)
+		if err := http.ListenAndServe(":"+*port, wrappedMux); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
 		}
 	}()
 
+	<-stop
+	log.Println("Server shutting down...")
+}
+
+func createMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/create", handlers.CreateHandler)
 	mux.HandleFunc("/get", handlers.GetHandler)
 	mux.HandleFunc("/update", handlers.UpdateHandler)
 	mux.HandleFunc("/delete/", handlers.DeleteHandler)
 
-	webserver.ServeStaticPage(mux)
-	webserver.ServeDynamicPage(mux)
-
-	wrappedMux := middleware.TraceIDMiddleware(mux)
-
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: wrappedMux,
-	}
-
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-
-	go func() {
-		slog.Info("Server starting on :8080")
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("Server failed to start", "error", err)
-		}
-	}()
-
-	<-stop
-
-	slog.Info("Shutting down server...")
-
-	if err := server.Close(); err != nil {
-		slog.Error("Server forced to shut down", "error", err)
-	}
+	return mux
 }

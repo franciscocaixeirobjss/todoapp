@@ -7,8 +7,9 @@
 </head>
 <body>
     <h1>Task List</h1>
+    <h2>User ID: {{.UserID}}</h2>
     <ul>
-        {{range .}}
+        {{range .Tasks}}
         <li>
             <strong>{{.Title}}</strong>: {{.Description}} (Status: {{.StatusString}})
         </li>

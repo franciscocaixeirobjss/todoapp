@@ -99,7 +99,7 @@ func BenchmarkCreateNonActorPattern(b *testing.B) {
 }
 
 func TestCreateTask(t *testing.T) {
-	SetTasks([]Task{}, 0)
+	SetTasks(map[int][]Task{}, map[int]int{})
 
 	task := Task{
 		Title:        "Test Task",
@@ -107,36 +107,37 @@ func TestCreateTask(t *testing.T) {
 		StatusString: "Not Started",
 	}
 
-	err := CreateTask(task)
+	err := CreateTask(1, task)
 	if err != nil {
-		t.Fatalf("AddTask failed: %v", err)
+		t.Fatalf("CreateTask failed: %v", err)
 	}
 
 	tasks, _ := GetManagerTasks()
 
-	if len(tasks) != 1 {
-		t.Fatalf("Expected 1 task, got %d", len(tasks))
+	if len(tasks[1]) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(tasks[1]))
 	}
 
-	if tasks[0].Title != "Test Task" {
-		t.Errorf("Expected task title to be 'Test Task', got '%s'", tasks[0].Title)
+	if tasks[1][0].Title != "Test Task" {
+		t.Errorf("Expected task title to be 'Test Task', got '%s'", tasks[1][0].Title)
 	}
 
-	if tasks[0].StatusID != NotStarted {
-		t.Errorf("Expected task status to be NotStarted, got %d", tasks[0].StatusID)
+	if tasks[1][0].StatusID != NotStarted {
+		t.Errorf("Expected task status to be NotStarted, got %d", tasks[1][0].StatusID)
 	}
 }
 
 func TestGetTasks(t *testing.T) {
-	taskToSave := []Task{
-		{ID: 1, Title: "Task 1", Deleted: false},
-		{ID: 2, Title: "Task 2", Deleted: true},
-		{ID: 3, Title: "Task 3", Deleted: false},
+	taskToSave := map[int][]Task{
+		1: {
+			{ID: 1, Title: "Task 1", Deleted: false},
+			{ID: 2, Title: "Task 2", Deleted: true},
+			{ID: 3, Title: "Task 3", Deleted: false},
+		},
 	}
+	SetTasks(taskToSave, map[int]int{})
 
-	SetTasks(taskToSave, 3)
-
-	tasks := GetTasks()
+	tasks := GetTasks(1)
 	if len(tasks) != 2 {
 		t.Fatalf("Expected 2 tasks, got %d", len(tasks))
 	}
@@ -148,10 +149,12 @@ func TestGetTasks(t *testing.T) {
 
 func TestUpdateTask(t *testing.T) {
 	now := time.Now()
-	tasksToSave := []Task{
-		{ID: 1, Title: "Task 1", StatusString: "NotStarted", CreatedAt: &now},
+	tasksToSave := map[int][]Task{
+		1: {
+			{ID: 1, Title: "Task 1", StatusString: "NotStarted", CreatedAt: &now},
+		},
 	}
-	SetTasks(tasksToSave, 1)
+	SetTasks(tasksToSave, map[int]int{1: 1})
 
 	updatedTask := Task{
 		ID:           1,
@@ -159,47 +162,48 @@ func TestUpdateTask(t *testing.T) {
 		StatusString: "Completed",
 	}
 
-	err := UpdateTask(updatedTask)
+	err := UpdateTask(1, updatedTask)
 	if err != nil {
-		t.Fatalf("updateTask failed: %v", err)
+		t.Fatalf("UpdateTask failed: %v", err)
 	}
 
 	tasks, _ := GetManagerTasks()
 
-	if tasks[0].Title != "Updated Task 1" {
-		t.Errorf("expected task title to be 'Updated Task 1', got '%s'", tasks[0].Title)
+	if tasks[1][0].Title != "Updated Task 1" {
+		t.Errorf("Expected task title to be 'Updated Task 1', got '%s'", tasks[1][0].Title)
 	}
 
-	if tasks[0].StatusID != Completed {
-		t.Errorf("expected task status to be Completed, got %d", tasks[0].StatusID)
+	if tasks[1][0].StatusID != Completed {
+		t.Errorf("Expected task status to be Completed, got %d", tasks[1][0].StatusID)
 	}
 
-	if tasks[0].UpdatedAt == nil {
-		t.Errorf("expected UpdatedAt to be set, but it was nil")
+	if tasks[1][0].UpdatedAt == nil {
+		t.Errorf("Expected UpdatedAt to be set, but it was nil")
 	}
 }
 
 func TestDeleteTask(t *testing.T) {
 	now := time.Now()
-	taskToDelete := []Task{
-		{ID: 1, Title: "Task 1", Deleted: false, CreatedAt: &now},
+	taskToDelete := map[int][]Task{
+		1: {
+			{ID: 1, Title: "Task 1", Deleted: false, CreatedAt: &now},
+		},
 	}
+	SetTasks(taskToDelete, map[int]int{1: 1})
 
-	SetTasks(taskToDelete, 1)
-
-	err := DeleteTask(1)
+	err := DeleteTask(1, 1)
 	if err != nil {
-		t.Fatalf("deleteTask failed: %v", err)
+		t.Fatalf("DeleteTask failed: %v", err)
 	}
 
 	tasks, _ := GetManagerTasks()
 
-	if !tasks[0].Deleted {
-		t.Errorf("expected task to be marked as deleted, but it was not")
+	if !tasks[1][0].Deleted {
+		t.Errorf("Expected task to be marked as deleted, but it was not")
 	}
 
-	if tasks[0].DeletedAt == nil {
-		t.Errorf("expected DeletedAt to be set, but it was nil")
+	if tasks[1][0].DeletedAt == nil {
+		t.Errorf("Expected DeletedAt to be set, but it was nil")
 	}
 }
 

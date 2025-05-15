@@ -20,8 +20,8 @@ type Task struct {
 
 // Manager struct to manage tasks and their state
 type Manager struct {
-	Tasks     []Task
-	MaxTaskID int
+	Tasks      map[int][]Task
+	MaxTaskIDs map[int]int
 }
 
 type Response struct {
@@ -31,6 +31,7 @@ type Response struct {
 
 type Request struct {
 	Action   string
+	UserID   int
 	Task     Task
 	TaskID   int
 	Response chan<- Response

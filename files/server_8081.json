@@ -1,0 +1,84 @@
+{
+  "tasks": {
+    "3": [
+      {
+        "id": 1,
+        "title": "Golang",
+        "description": "Task b5e78753-2ca8-478d-b8ef-705cc7e56a5e",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:25:57.650514+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": "2025-05-15T21:58:48.2060044+01:00",
+        "deleted": true
+      },
+      {
+        "id": 2,
+        "title": "Golang",
+        "description": "Task 8d5318a8-1708-432a-988b-003970b919b4",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:26:05.8114169+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": "2025-05-15T21:59:20.7994702+01:00",
+        "deleted": true
+      },
+      {
+        "id": 3,
+        "title": "Golang",
+        "description": "Task 3 updated twice",
+        "status_id": 2,
+        "status": "Started",
+        "created_at": "2025-05-15T15:28:39.0281993+01:00",
+        "updated_at": "2025-05-15T22:49:25.3057818+01:00",
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      },
+      {
+        "id": 4,
+        "title": "Golang",
+        "description": "Task aed3dc67-1252-4982-8e89-1eb307707ac9",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T21:59:12.1245854+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      },
+      {
+        "id": 5,
+        "title": "Golang",
+        "description": "Task ce746b0a-087b-49d4-bc5c-0f9249b10f0d",
+        "status_id": 2,
+        "status": "Started",
+        "created_at": "2025-05-15T22:51:00.2547401+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      }
+    ],
+    "6": [
+      {
+        "id": 1,
+        "title": "Golang",
+        "description": "Task 02c77655-1df3-4c91-beb8-c153679af72e",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:26:18.1746545+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      }
+    ]
+  },
+  "maxTaskIDs": {
+    "3": 5,
+    "6": 1
+  }
+}

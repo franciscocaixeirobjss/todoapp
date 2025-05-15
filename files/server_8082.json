@@ -1,0 +1,21 @@
+{
+  "tasks": {
+    "1": [
+      {
+        "id": 1,
+        "title": "Golang",
+        "description": "Task 033654e4-943c-42c9-8a08-a061cb47ac9e",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:28:27.3873319+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      }
+    ]
+  },
+  "maxTaskIDs": {
+    "1": 1
+  }
+}

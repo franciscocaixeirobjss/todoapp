@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"todoapp/middleware"
 	"todoapp/task"
 )
 
@@ -22,8 +23,15 @@ func CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "UserID is required", http.StatusBadRequest)
+		return
+	}
+
 	response := make(chan task.Response, 1)
 	request := task.Request{
+		UserID:   userID,
 		Action:   task.CreateRequest,
 		Task:     taskToBeCreated,
 		Response: response,
@@ -48,8 +56,15 @@ func GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	response := make(chan task.Response, 1)
 	request := task.Request{
+		UserID:   userID,
 		Action:   task.GetRequest,
 		Response: response,
 	}
@@ -86,8 +101,15 @@ func UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "UserID is required", http.StatusBadRequest)
+		return
+	}
+
 	response := make(chan task.Response, 1)
 	request := task.Request{
+		UserID:   userID,
 		Action:   task.UpdateRequest,
 		Task:     taskToBeUpdated,
 		Response: response,
@@ -124,8 +146,15 @@ func DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, err := middleware.GetUserID(r.Context())
+	if err != nil {
+		http.Error(w, "UserID is required", http.StatusBadRequest)
+		return
+	}
+
 	response := make(chan task.Response, 1)
 	request := task.Request{
+		UserID:   userID,
 		Action:   task.DeleteRequest,
 		TaskID:   taskID,
 		Response: response,

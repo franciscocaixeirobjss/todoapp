@@ -31,7 +31,9 @@ var (
 )
 
 var (
-	manager      = Manager{Tasks: []Task{}, MaxTaskID: 0}
+	manager = Manager{
+		Tasks:      make(map[int][]Task),
+		MaxTaskIDs: make(map[int]int)}
 	RequestsChan chan Request
 )
 
@@ -40,29 +42,29 @@ func InitChannel(requestChanSize int) {
 	go processLoop()
 }
 
-func SetTasks(tasks []Task, maxTaskID int) {
+func SetTasks(tasks map[int][]Task, maxTaskIDs map[int]int) {
 	manager.Tasks = tasks
-	manager.MaxTaskID = maxTaskID
+	manager.MaxTaskIDs = maxTaskIDs
 }
 
-func GetManagerTasks() ([]Task, int) {
-	return manager.Tasks, manager.MaxTaskID
+func GetManagerTasks() (map[int][]Task, map[int]int) {
+	return manager.Tasks, manager.MaxTaskIDs
 }
 
 func processLoop() {
 	for req := range RequestsChan {
 		switch req.Action {
 		case CreateRequest:
-			err := CreateTask(req.Task)
+			err := CreateTask(req.UserID, req.Task)
 			req.Response <- Response{Tasks: nil, Error: err}
 		case GetRequest:
-			tasks := GetTasks()
+			tasks := GetTasks(req.UserID)
 			req.Response <- Response{Tasks: tasks, Error: nil}
 		case UpdateRequest:
-			err := UpdateTask(req.Task)
+			err := UpdateTask(req.UserID, req.Task)
 			req.Response <- Response{Tasks: nil, Error: err}
 		case DeleteRequest:
-			err := DeleteTask(req.TaskID)
+			err := DeleteTask(req.UserID, req.TaskID)
 			req.Response <- Response{Tasks: nil, Error: err}
 		default:
 			req.Response <- Response{Tasks: nil, Error: errors.New("unknown action")}
@@ -72,7 +74,7 @@ func processLoop() {
 }
 
 // CreateTask adds a new task to the list of tasks
-func CreateTask(task Task) error {
+func CreateTask(userID int, task Task) error {
 	now := time.Now()
 
 	statusID, err := convertStringToStatusID(task.StatusString)
@@ -80,19 +82,19 @@ func CreateTask(task Task) error {
 		return ErrInvalidStatus
 	}
 
-	task.ID = manager.MaxTaskID + 1
-	manager.MaxTaskID++
+	manager.MaxTaskIDs[userID]++
+	task.ID = manager.MaxTaskIDs[userID]
 	task.CreatedAt = &now
 	task.StatusID = statusID
 
-	manager.Tasks = append(manager.Tasks, task)
+	manager.Tasks[userID] = append(manager.Tasks[userID], task)
 	return nil
 }
 
 // GetTasks retrieves all non-deleted tasks
-func GetTasks() []Task {
+func GetTasks(userID int) []Task {
 	var currentTasks []Task
-	for _, task := range manager.Tasks {
+	for _, task := range manager.Tasks[userID] {
 		if !task.Deleted {
 			currentTasks = append(currentTasks, task)
 		}
@@ -101,14 +103,20 @@ func GetTasks() []Task {
 }
 
 // UpdateTask updates an existing task
-func UpdateTask(updatedTask Task) error {
-	for i, task := range manager.Tasks {
+func UpdateTask(userID int, updatedTask Task) error {
+	for i, task := range manager.Tasks[userID] {
 		if task.ID == updatedTask.ID {
+			statusID, err := convertStringToStatusID(updatedTask.StatusString)
+			if err != nil {
+				return err
+			}
+
 			now := time.Now()
-			manager.Tasks[i].Title = updatedTask.Title
-			manager.Tasks[i].Description = updatedTask.Description
-			manager.Tasks[i].StatusID, _ = convertStringToStatusID(updatedTask.StatusString)
-			manager.Tasks[i].UpdatedAt = &now
+			manager.Tasks[userID][i].Title = updatedTask.Title
+			manager.Tasks[userID][i].Description = updatedTask.Description
+			manager.Tasks[userID][i].StatusID = statusID
+			manager.Tasks[userID][i].StatusString = strings.ReplaceAll(updatedTask.StatusString, " ", "")
+			manager.Tasks[userID][i].UpdatedAt = &now
 			return nil
 		}
 	}
@@ -116,13 +124,13 @@ func UpdateTask(updatedTask Task) error {
 }
 
 // DeleteTask marks a task as deleted
-func DeleteTask(taskID int) error {
+func DeleteTask(userID int, taskID int) error {
 	now := time.Now()
 
-	for i, task := range manager.Tasks {
+	for i, task := range manager.Tasks[userID] {
 		if task.ID == taskID && !task.Deleted {
-			manager.Tasks[i].Deleted = true
-			manager.Tasks[i].DeletedAt = &now
+			manager.Tasks[userID][i].Deleted = true
+			manager.Tasks[userID][i].DeletedAt = &now
 			return nil
 		}
 	}

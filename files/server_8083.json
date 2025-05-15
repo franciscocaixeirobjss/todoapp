@@ -1,0 +1,33 @@
+{
+  "tasks": {
+    "2": [
+      {
+        "id": 1,
+        "title": "Golang",
+        "description": "Task a256aa53-d706-465f-ad80-3c2abedf61c2",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:28:32.0007605+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      },
+      {
+        "id": 2,
+        "title": "Golang",
+        "description": "Task 467ad32c-a8ac-4914-854d-30a085929aaf",
+        "status_id": 1,
+        "status": "Not Started",
+        "created_at": "2025-05-15T15:28:32.8322419+01:00",
+        "updated_at": null,
+        "due_date": null,
+        "deleted_at": null,
+        "deleted": false
+      }
+    ]
+  },
+  "maxTaskIDs": {
+    "2": 2
+  }
+}

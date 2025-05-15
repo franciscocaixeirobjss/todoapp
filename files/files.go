@@ -2,56 +2,45 @@ package files
 
 import (
 	"encoding/json"
-	"io"
 	"log/slog"
 	"os"
 	"todoapp/task"
 )
 
+type dataFormat struct {
+	Tasks      map[int][]task.Task `json:"tasks"`
+	MaxTaskIDs map[int]int         `json:"maxTaskIDs"`
+}
+
 // LoadData initializes the list of tasks and maxTaskID from a JSON file
-func LoadData(filePath string, tasks *[]task.Task, maxTaskID *int) error {
+func LoadData(filePath string, tasks *map[int][]task.Task, maxTaskIDs *map[int]int) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			*tasks = []task.Task{}
-			*maxTaskID = 0
+			*tasks = make(map[int][]task.Task)
+			*maxTaskIDs = make(map[int]int)
 			slog.Info("No existing data file found. Starting with an empty task list.")
 			return nil
 		}
 		return err
 	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
 
-		}
-	}(file)
+	defer file.Close()
 
-	data, err := io.ReadAll(file)
-	if err != nil {
-		slog.Error("Failed to read file", "error", err)
+	decoder := json.NewDecoder(file)
+	data := dataFormat{}
+
+	if err := decoder.Decode(&data); err != nil {
 		return err
 	}
 
-	err = json.Unmarshal(data, tasks)
-	if err != nil {
-		slog.Error("Failed to unmarshal JSON", "error", err)
-		return err
-	}
-
-	for _, loadedTask := range *tasks {
-		if loadedTask.ID > *maxTaskID {
-			*maxTaskID = loadedTask.ID
-		}
-	}
-
-	slog.Info("Loaded tasks", "tasks", *tasks)
-	slog.Info("Max task ID", "maxTaskID", *maxTaskID)
+	*tasks = data.Tasks
+	*maxTaskIDs = data.MaxTaskIDs
 	return nil
 }
 
 // SaveData saves the tasks to a JSON file
-func SaveData(filename string, tasks []task.Task) error {
+func SaveData(filename string, tasks map[int][]task.Task, maxTaskIDs map[int]int) error {
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -65,5 +54,14 @@ func SaveData(filename string, tasks []task.Task) error {
 
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	return encoder.Encode(tasks)
+	data := dataFormat{
+		Tasks:      tasks,
+		MaxTaskIDs: maxTaskIDs,
+	}
+
+	if err := encoder.Encode(&data); err != nil {
+		return err
+	}
+
+	return nil
 }

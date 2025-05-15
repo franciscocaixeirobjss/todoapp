@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"todoapp/middleware"
 	"todoapp/task"
 )
 
@@ -41,6 +43,7 @@ func BenchmarkUpdateHandlerNonActor(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			req := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+			req = addUserIDToContext(req, 1)
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -59,6 +62,7 @@ func BenchmarkUpdateHandlerActor_NoParallel(b *testing.B) {
 
 	response := make(chan task.Response, 1)
 	task.RequestsChan <- task.Request{
+		UserID: 1,
 		Action: task.CreateRequest,
 		Task: task.Task{
 			Title:        "Initial Task",
@@ -80,6 +84,7 @@ func BenchmarkUpdateHandlerActor_NoParallel(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+		r = addUserIDToContext(r, 1)
 
 		r.Header.Set("Content-Type", "application/json")
 		UpdateHandler(w, r)
@@ -96,6 +101,7 @@ func BenchmarkUpdateHandlerActor(b *testing.B) {
 
 	response := make(chan task.Response, 1)
 	task.RequestsChan <- task.Request{
+		UserID: 1,
 		Action: task.CreateRequest,
 		Task: task.Task{
 			Title:        "Initial Task",
@@ -117,6 +123,7 @@ func BenchmarkUpdateHandlerActor(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			req := httptest.NewRequest(http.MethodPut, "/update", bytes.NewReader(updatedTaskJSON))
+			req = addUserIDToContext(req, 1)
 			req.Header.Set("Content-Type", "application/json")
 			w := httptest.NewRecorder()
 
@@ -136,7 +143,9 @@ func BenchmarkCreateHandlerNonActor(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+			req = addUserIDToContext(req, 1)
 			req.Header.Set("Content-Type", "application/json")
+
 			w := httptest.NewRecorder()
 
 			CreateHandlerWithManager(w, req, manager)
@@ -154,9 +163,11 @@ func BenchmarkCreateHandlerActor_NoParallel(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		w := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
 
+		r := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+		r = addUserIDToContext(r, 1)
 		r.Header.Set("Content-Type", "application/json")
+
 		CreateHandler(w, r)
 
 		if w.Code != http.StatusCreated {
@@ -172,7 +183,9 @@ func BenchmarkCreateHandlerActor(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task Description", "status": "NotStarted"}`))
+			req = addUserIDToContext(req, 1)
 			req.Header.Set("Content-Type", "application/json")
+
 			w := httptest.NewRecorder()
 
 			CreateHandler(w, req)
@@ -191,12 +204,15 @@ func TestCreateHandler_ServiceUnavailable(t *testing.T) {
 
 	response := make(chan task.Response, 1)
 	mockRequestsChan <- task.Request{
+		UserID:   1,
 		Action:   task.CreateRequest,
 		Task:     task.Task{Title: "Mock Task"},
 		Response: response,
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(`{"title": "New Task", "description": "Task", "status": "NotStarted"}`))
+	req = addUserIDToContext(req, 1)
+
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
@@ -211,7 +227,7 @@ func TestCreateHandler_ServiceUnavailable(t *testing.T) {
 func TestCreateHandler_Parallel(t *testing.T) {
 	task.InitChannel(100)
 
-	task.SetTasks([]task.Task{}, 0)
+	task.SetTasks(createEmptyTaskMap(), createEmptyTaskCountMap())
 
 	// Define test cases
 	var tests []struct {
@@ -238,6 +254,7 @@ func TestCreateHandler_Parallel(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(fmt.Sprintf(`{"title": "Task %d", "description": "Description %d", "status": "NotStarted"}`, tt.taskID, tt.taskID)))
 			req.Header.Set("Content-Type", "application/json")
+			req = addUserIDToContext(req, 1) // Add UserID to context
 			w := httptest.NewRecorder()
 
 			CreateHandler(w, req)
@@ -250,11 +267,17 @@ func TestCreateHandler_Parallel(t *testing.T) {
 	}
 }
 
+func addUserIDToContext(req *http.Request, userID int) *http.Request {
+	ctx := req.Context()
+	ctx = context.WithValue(ctx, middleware.UserIDKey, userID)
+	return req.WithContext(ctx)
+}
+
 func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 	numRequests := 100
 	task.InitChannel(numRequests)
 
-	task.SetTasks([]task.Task{}, 0)
+	task.SetTasks(createEmptyTaskMap(), createEmptyTaskCountMap())
 
 	var wg sync.WaitGroup
 
@@ -265,6 +288,7 @@ func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/create", strings.NewReader(fmt.Sprintf(`{"title": "Task %d", "description": "Description %d", "status": "NotStarted"}`, taskID, taskID)))
 			req.Header.Set("Content-Type", "application/json")
+			req = addUserIDToContext(req, 1) // Add UserID to context
 			w := httptest.NewRecorder()
 
 			CreateHandler(w, req)
@@ -280,6 +304,7 @@ func TestCreateHandler_Goroutine_Parallel(t *testing.T) {
 
 	response := make(chan task.Response, 1)
 	task.RequestsChan <- task.Request{
+		UserID:   1,
 		Action:   task.GetRequest,
 		Response: response,
 	}
@@ -322,6 +347,7 @@ func TestCreateHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/create", strings.NewReader(test.data))
+			req = addUserIDToContext(req, 1)
 			rec := httptest.NewRecorder()
 
 			CreateHandler(rec, req)
@@ -336,10 +362,14 @@ func TestCreateHandler(t *testing.T) {
 func TestGetHandler(t *testing.T) {
 	task.InitChannel(10)
 
-	task.SetTasks([]task.Task{
-		{ID: 1, Title: "Task 1", Deleted: false},
-		{ID: 2, Title: "Task 2", Deleted: true},
-	}, 2)
+	task.SetTasks(map[int][]task.Task{
+		1: {
+			{ID: 1, Title: "Task 1", Deleted: false},
+			{ID: 2, Title: "Task 2", Deleted: true},
+		},
+	}, map[int]int{
+		1: 2,
+	})
 
 	tests := []struct {
 		name             string
@@ -365,6 +395,8 @@ func TestGetHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/get", nil)
+			req = addUserIDToContext(req, 1)
+
 			rec := httptest.NewRecorder()
 
 			GetHandler(rec, req)
@@ -393,7 +425,7 @@ func TestTaskActor_Concurrency(t *testing.T) {
 	numGoroutines := 100
 	var wg sync.WaitGroup
 
-	task.SetTasks([]task.Task{}, 0)
+	task.SetTasks(createEmptyTaskMap(), createEmptyTaskCountMap())
 
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
@@ -402,6 +434,7 @@ func TestTaskActor_Concurrency(t *testing.T) {
 
 			response := make(chan task.Response)
 			task.RequestsChan <- task.Request{
+				UserID: 1,
 				Action: task.CreateRequest,
 				Task: task.Task{
 					Title:        "Task " + strconv.Itoa(taskID),
@@ -421,6 +454,7 @@ func TestTaskActor_Concurrency(t *testing.T) {
 
 	response := make(chan task.Response)
 	task.RequestsChan <- task.Request{
+		UserID:   1,
 		Action:   task.GetRequest,
 		Response: response,
 	}
@@ -437,10 +471,11 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 	numGoroutines := 50
 	var wg sync.WaitGroup
 
-	task.SetTasks([]task.Task{}, 0)
+	task.SetTasks(createEmptyTaskMap(), createEmptyTaskCountMap())
 
 	response := make(chan task.Response, 1)
 	task.RequestsChan <- task.Request{
+		UserID: 1,
 		Action: task.CreateRequest,
 		Task: task.Task{
 			Title:        "Initial Task",
@@ -460,6 +495,7 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 
 			response := make(chan task.Response, 1)
 			task.RequestsChan <- task.Request{
+				UserID: 1,
 				Action: task.UpdateRequest,
 				Task: task.Task{
 					ID:           1,
@@ -480,6 +516,7 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 
 	response = make(chan task.Response, 1)
 	task.RequestsChan <- task.Request{
+		UserID:   1,
 		Action:   task.GetRequest,
 		Response: response,
 	}
@@ -504,9 +541,13 @@ func TestTaskActor_ConcurrentUpdate(t *testing.T) {
 func TestUpdateHandler(t *testing.T) {
 	task.InitChannel(10)
 
-	task.SetTasks([]task.Task{
-		{ID: 1, Title: "Task 1", StatusString: "NotStarted"},
-	}, 1)
+	task.SetTasks(map[int][]task.Task{
+		1: {
+			{ID: 1, Title: "Task 1", StatusString: "NotStarted"},
+		},
+	}, map[int]int{
+		1: 1,
+	})
 
 	tests := []struct {
 		name           string
@@ -536,6 +577,8 @@ func TestUpdateHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest(test.method, "/update", strings.NewReader(test.data))
+			req = addUserIDToContext(req, 1)
+
 			rec := httptest.NewRecorder()
 
 			UpdateHandler(rec, req)
@@ -550,10 +593,14 @@ func TestUpdateHandler(t *testing.T) {
 func TestDeleteHandler(t *testing.T) {
 	task.InitChannel(10)
 
-	task.SetTasks([]task.Task{
-		{ID: 1, Title: "Task 1", Deleted: false},
-		{ID: 2, Title: "Task 2", Deleted: true},
-	}, 2)
+	task.SetTasks(map[int][]task.Task{
+		1: {
+			{ID: 1, Title: "Task 1", Deleted: false},
+			{ID: 2, Title: "Task 2", Deleted: true},
+		},
+	}, map[int]int{
+		1: 2,
+	})
 
 	tests := []struct {
 		name           string
@@ -596,6 +643,8 @@ func TestDeleteHandler(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			req, _ := http.NewRequest(test.method, test.url, nil)
+			req = addUserIDToContext(req, 1)
+
 			rec := httptest.NewRecorder()
 
 			DeleteHandler(rec, req)
@@ -605,4 +654,12 @@ func TestDeleteHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createEmptyTaskMap() map[int][]task.Task {
+	return make(map[int][]task.Task)
+}
+
+func createEmptyTaskCountMap() map[int]int {
+	return make(map[int]int)
 }
