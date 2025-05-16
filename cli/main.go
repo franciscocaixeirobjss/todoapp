@@ -15,7 +15,10 @@ import (
 	"todoapp/task"
 )
 
-var stop chan os.Signal
+var (
+	stop    chan os.Signal
+	manager task.Manager
+)
 
 func main() {
 	opts := &slog.HandlerOptions{
@@ -25,9 +28,12 @@ func main() {
 	logger := slog.New(slogHandler)
 	slog.SetDefault(logger)
 
-	var tasks []task.Task
-	var maxTaskID int
-	err := files.LoadData("todo.json", &tasks, &maxTaskID)
+	manager = task.Manager{
+		Tasks:      make(map[int][]task.Task),
+		MaxTaskIDs: make(map[int]int),
+	}
+
+	err := files.LoadData("todo.json", &manager.Tasks, &manager.MaxTaskIDs)
 	if err != nil {
 		slog.Error("Failed to load data", "error", err)
 		os.Exit(1)
@@ -45,8 +51,7 @@ func main() {
 }
 
 func saveTasks() {
-	tasks, _ := task.GetManagerTasks()
-	if err := files.SaveData("todo.json", tasks); err != nil {
+	if err := files.SaveData("todo.json", manager.Tasks, manager.MaxTaskIDs); err != nil {
 		slog.Error("Failed to save tasks to file", "error", err)
 	} else {
 		slog.Info("Tasks saved successfully")

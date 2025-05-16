@@ -14,13 +14,12 @@ import (
 	"github.com/google/uuid"
 )
 
-// should not use built-in type string as key for value; define your own type to avoid collisions
 type contextKey string
 
-// define a custom type for the UserID key to avoid collisions
-const UserIDKey contextKey = "UserID"
-
 const traceIDKey contextKey = "TraceID"
+
+// UserIDKey define a custom type for the UserID key to avoid collisions
+const UserIDKey contextKey = "UserID"
 
 // PortKey is the context key for the server port
 const PortKey contextKey = "Port"
@@ -83,6 +82,21 @@ func UserIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Extracts the logic for determining the server address based on UserID into a separate function
+func getServerAddress(userID int) string {
+	serverIndex := userID % 3
+	var serverAddr string
+	switch serverIndex {
+	case 0:
+		serverAddr = "localhost:8081"
+	case 1:
+		serverAddr = "localhost:8082"
+	case 2:
+		serverAddr = "localhost:8083"
+	}
+	return serverAddr
+}
+
 // LoadBalancerMiddleware routes requests to one of three servers based on UserID
 func LoadBalancerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -92,16 +106,7 @@ func LoadBalancerMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		serverIndex := userID % 3
-		var serverAddr string
-		switch serverIndex {
-		case 0:
-			serverAddr = "localhost:8081"
-		case 1:
-			serverAddr = "localhost:8082"
-		case 2:
-			serverAddr = "localhost:8083"
-		}
+		serverAddr := getServerAddress(userID)
 
 		var requestBody string
 		if r.Body != nil {
@@ -130,7 +135,7 @@ func LoadBalancerMiddleware(next http.Handler) http.Handler {
 			http.Error(w, "Bad Gateway: Unable to connect to the target server", http.StatusBadGateway)
 		}
 
-		slog.Info("LoadBalancerMiddleware executed", "ServerIndex", serverIndex)
+		slog.Info("LoadBalancerMiddleware executed", "ServerAddress", serverAddr)
 		proxy.ServeHTTP(w, r)
 	})
 }

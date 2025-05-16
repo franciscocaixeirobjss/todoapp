@@ -37,16 +37,6 @@ var (
 	RequestsChan chan Request
 )
 
-func InitChannel(requestChanSize int) {
-	RequestsChan = make(chan Request, requestChanSize)
-	go processLoop()
-}
-
-func SetTasks(tasks map[int][]Task, maxTaskIDs map[int]int) {
-	manager.Tasks = tasks
-	manager.MaxTaskIDs = maxTaskIDs
-}
-
 func GetManagerTasks() (map[int][]Task, map[int]int) {
 	return manager.Tasks, manager.MaxTaskIDs
 }
@@ -71,6 +61,32 @@ func processLoop() {
 		}
 		close(req.Response)
 	}
+}
+
+func convertStringToStatusID(status string) (Status, error) {
+	switch strings.ReplaceAll(status, " ", "") {
+	case "NotStarted":
+		return NotStarted, nil
+	case "Started":
+		return Started, nil
+	case "Completed":
+		return Completed, nil
+	default:
+		return Unknown, ErrInvalidStatus
+	}
+}
+
+// InitChannel initializes the channel for task requests
+// requestChanSize is the size of the channel for task requests
+func InitChannel(requestChanSize int) {
+	RequestsChan = make(chan Request, requestChanSize)
+	go processLoop()
+}
+
+// SetTasks sets the tasks and max task IDs for the manager
+func SetTasks(tasks map[int][]Task, maxTaskIDs map[int]int) {
+	manager.Tasks = tasks
+	manager.MaxTaskIDs = maxTaskIDs
 }
 
 // CreateTask adds a new task to the list of tasks
@@ -136,17 +152,4 @@ func DeleteTask(userID int, taskID int) error {
 	}
 
 	return ErrTaskNotFound
-}
-
-func convertStringToStatusID(status string) (Status, error) {
-	switch strings.ReplaceAll(status, " ", "") {
-	case "NotStarted":
-		return NotStarted, nil
-	case "Started":
-		return Started, nil
-	case "Completed":
-		return Completed, nil
-	default:
-		return Unknown, ErrInvalidStatus
-	}
 }

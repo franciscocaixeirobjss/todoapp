@@ -1,3 +1,6 @@
+// Non-actor implementation of a task manager
+// This code is a non-actor implementation of a task manager using a shared Manager and sync.Mutex.
+// It provides methods to create, update, delete, and retrieve tasks.
 package task
 
 import (
@@ -12,6 +15,7 @@ type NonActorManager struct {
 	MaxTaskID int
 }
 
+// CreateTasks creates a new task and assigns it a unique ID
 func (m *NonActorManager) CreateTask(task Task) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -22,6 +26,7 @@ func (m *NonActorManager) CreateTask(task Task) {
 	m.Tasks = append(m.Tasks, task)
 }
 
+// GetTasks retrieves all non-deleted tasks
 func (m *NonActorManager) GetTasks() []Task {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -35,6 +40,7 @@ func (m *NonActorManager) GetTasks() []Task {
 	return currentTasks
 }
 
+// UpdateTask updates an existing task
 func (m *NonActorManager) UpdateTask(updatedTask Task) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -51,6 +57,7 @@ func (m *NonActorManager) UpdateTask(updatedTask Task) {
 	}
 }
 
+// DeleteTask marks a task as deleted
 func (m *NonActorManager) DeleteTask(taskID int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

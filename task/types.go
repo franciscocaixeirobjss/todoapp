@@ -24,11 +24,13 @@ type Manager struct {
 	MaxTaskIDs map[int]int
 }
 
+// Response represents the response structure for task operations
 type Response struct {
 	Tasks []Task
 	Error error
 }
 
+// Request represents a request structure for task operations
 type Request struct {
 	Action   string
 	UserID   int

@@ -31,7 +31,6 @@ func ServeDynamicPage(mux *http.ServeMux) {
 			return
 		}
 
-		// Extract user ID and validate URL pattern
 		pathParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 		if len(pathParts) != 3 || pathParts[0] != "user" || pathParts[2] != "list" {
 			http.Error(w, "Invalid URL pattern. Expected /user/{id}/list", http.StatusBadRequest)

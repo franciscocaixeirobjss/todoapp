@@ -345,8 +345,8 @@ ok      todoapp/handlers        4.256s
 ✅ *The Non-Actor Pattern outperformed the Actor Pattern in terms of speed and memory usage.*
 
 ### Update
-- **Non-Actor Pattern**: ~90 ns/op~
-- **Actor Pattern**: ~440 ns/op~ 
+- **Non-Actor Pattern**: ~90 ns/op
+- **Actor Pattern**: ~440 ns/op
 ✅ *The Non-Actor Pattern was significantly faster.*
 
 ---
