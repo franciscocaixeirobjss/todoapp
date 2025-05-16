@@ -6,6 +6,7 @@ import (
 	"todoapp/task"
 )
 
+// CreateHandlerWithManager handles the creation of a new task using the NonActorManager
 func CreateHandlerWithManager(w http.ResponseWriter, r *http.Request, manager *task.NonActorManager) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
@@ -24,6 +25,7 @@ func CreateHandlerWithManager(w http.ResponseWriter, r *http.Request, manager *t
 	w.WriteHeader(http.StatusCreated)
 }
 
+// GetHandlerWithManager handles the retrieval of tasks for a specific user using the NonActorManager
 func UpdateHandlerWithManager(w http.ResponseWriter, r *http.Request, manager *task.NonActorManager) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Invalid HTTP method.", http.StatusMethodNotAllowed)
